@@ -2,6 +2,9 @@ name: Momentum Detector
 
 on:
   workflow_dispatch:
+  schedule:
+
+    - cron: "*/15 * * * *"
 
 jobs:
   momentum:
@@ -28,13 +31,11 @@ jobs:
               "NVDA",
               "AMD",
               "TSLA",
-              "AAPL",
-              "AMZN",
-              "META",
-              "NFLX",
-              "AVGO",
               "PLTR",
-              "COIN"
+              "COIN",
+              "HOOD",
+              "MSTR",
+              "SMCI"
           ]
 
           def send_telegram(message):
