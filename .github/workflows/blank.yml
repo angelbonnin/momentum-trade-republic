@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Escanear acciones y enviar alertas
+      - name: Escanear acciones
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -23,7 +23,6 @@ jobs:
           import urllib.parse
           import urllib.request
           import json
-          import time
 
           API_KEY = os.environ["TWELVE_DATA_API_KEY"]
           BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -55,12 +54,47 @@ jobs:
 
               with urllib.request.urlopen(
                   request,
-                  timeout=15
+                  timeout=20
               ) as response:
                   return response.read().decode()
 
           print("🚨 MOMENTUM DETECTOR")
           print("=" * 60)
+
+          symbols_string = ",".join(SYMBOLS)
+
+          params = urllib.parse.urlencode({
+              "symbol": symbols_string,
+              "interval": "1min",
+              "outputsize": "61",
+              "apikey": API_KEY
+          })
+
+          url = (
+              "https://api.twelvedata.com/time_series?"
+              + params
+          )
+
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "User-Agent": "MomentumDetector/1.0"
+              }
+          )
+
+          try:
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+                  data = json.load(response)
+
+          except Exception as e:
+
+              print("❌ Error consultando Twelve Data:")
+              print(e)
+              raise SystemExit(1)
 
           alerts = 0
           errors = 0
@@ -68,47 +102,40 @@ jobs:
           for symbol in SYMBOLS:
 
               try:
-                  time.sleep(8)
 
-                  params = urllib.parse.urlencode({
-                      "symbol": symbol,
-                      "interval": "1min",
-                      "outputsize": "61",
-                      "apikey": API_KEY
-                  })
+                  # Twelve Data puede devolver los símbolos
+                  # como claves independientes en una respuesta batch.
+                  if symbol not in data:
 
-                  url = (
-                      "https://api.twelvedata.com/time_series?"
-                      + params
-                  )
-
-                  request = urllib.request.Request(
-                      url,
-                      headers={
-                          "User-Agent": "MomentumDetector/1.0"
-                      }
-                  )
-
-                  with urllib.request.urlopen(
-                      request,
-                      timeout=20
-                  ) as response:
-                      data = json.load(response)
-
-                  if "values" not in data:
                       print(
-                          f"⚠️ {symbol}: sin datos"
+                          f"⚠️ {symbol}: "
+                          "sin datos"
                       )
+
                       errors += 1
                       continue
 
-                  values = data["values"]
+                  symbol_data = data[symbol]
 
-                  if len(values) < 61:
+                  if "values" not in symbol_data:
+
                       print(
                           f"⚠️ {symbol}: "
-                          f"datos insuficientes"
+                          "datos no disponibles"
                       )
+
+                      errors += 1
+                      continue
+
+                  values = symbol_data["values"]
+
+                  if len(values) < 61:
+
+                      print(
+                          f"⚠️ {symbol}: "
+                          f"solo {len(values)} velas"
+                      )
+
                       errors += 1
                       continue
 
@@ -128,16 +155,20 @@ jobs:
                   volumes = []
 
                   for candle in values:
+
                       if "volume" in candle:
+
                           volumes.append(
                               float(candle["volume"])
                           )
 
                   if len(volumes) < 2:
+
                       print(
                           f"{symbol}: "
-                          f"sin datos de volumen"
+                          "sin volumen"
                       )
+
                       continue
 
                   current_volume = volumes[0]
@@ -148,18 +179,22 @@ jobs:
                   )
 
                   if average_volume > 0:
+
                       volume_ratio = (
                           current_volume
                           / average_volume
                       )
+
                   else:
+
                       volume_ratio = 0
 
                   print(
                       f"{symbol}: "
                       f"${current_price:.2f} | "
                       f"60m: {change:+.2f}% | "
-                      f"Volumen: {volume_ratio:.1f}x"
+                      f"Volumen: "
+                      f"{volume_ratio:.1f}x"
                   )
 
                   if (
@@ -176,13 +211,14 @@ jobs:
                           f"+{change:.2f}%\n"
                           f"🔥 Volumen: "
                           f"{volume_ratio:.1f}x "
-                          f"la media\n\n"
-                          "⚠️ Señal de momentum, "
-                          "NO recomendación automática "
-                          "de compra."
+                          "la media\n\n"
+                          "⚠️ Señal de momentum. "
+                          "No es una recomendación "
+                          "automática de compra."
                       )
 
                       try:
+
                           send_telegram(message)
 
                           print(
@@ -192,26 +228,30 @@ jobs:
 
                           alerts += 1
 
-                      except Exception as telegram_error:
+                      except Exception as e:
+
                           print(
                               f"❌ Error Telegram: "
-                              f"{telegram_error}"
+                              f"{e}"
                           )
 
               except Exception as e:
+
                   print(
-                      f"⚠️ {symbol}: "
-                      f"datos no disponibles ({e})"
+                      f"⚠️ {symbol}: ERROR - {e}"
                   )
+
                   errors += 1
-                  continue
 
           print("=" * 60)
+
           print(
               f"Alertas enviadas: {alerts}"
           )
+
           print(
               f"Acciones con errores: {errors}"
           )
+
           print("Escaneo terminado.")
           PY
