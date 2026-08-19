@@ -4,43 +4,47 @@ on:
   workflow_dispatch:
 
 jobs:
-  intraday-test:
+  twelve-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Probar datos intradía
+      - name: Probar Twelve Data
         env:
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
         run: |
           python - <<'PY'
           import os
+          import urllib.parse
           import urllib.request
           import json
-          import time
 
-          token = os.environ["FINNHUB_API_KEY"]
+          api_key = os.environ["TWELVE_DATA_API_KEY"]
 
-          now = int(time.time())
-          start = now - 7200
+          params = urllib.parse.urlencode({
+              "symbol": "NVDA",
+              "interval": "1min",
+              "outputsize": "10",
+              "apikey": api_key
+          })
 
-          url = (
-              "https://finnhub.io/api/v1/stock/candle"
-              f"?symbol=NVDA"
-              f"&resolution=1"
-              f"&from={start}"
-              f"&to={now}"
-              f"&token={token}"
+          url = "https://api.twelvedata.com/time_series?" + params
+
+          request = urllib.request.Request(
+              url,
+              headers={"User-Agent": "MomentumDetector/1.0"}
           )
 
-          with urllib.request.urlopen(url) as response:
+          with urllib.request.urlopen(request) as response:
               data = json.load(response)
 
-          print("Respuesta Finnhub:")
-          print(json.dumps(data, indent=2))
-
-          if data.get("s") == "ok":
-              print("✅ DATOS INTRADÍA FUNCIONANDO")
-              print("Velas recibidas:", len(data.get("c", [])))
+          if "values" in data:
+              print("✅ TWELVE DATA FUNCIONANDO")
+              print("Velas recibidas:", len(data["values"]))
+              print()
+              print("Última vela:")
+              print(data["values"][0])
           else:
-              print("❌ No se recibieron datos intradía")
+              print("❌ Twelve Data respondió con un error:")
+              print(json.dumps(data, indent=2))
+              raise SystemExit(1)
           PY
