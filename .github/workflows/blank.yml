@@ -2,78 +2,45 @@ name: Momentum Detector
 
 on:
   workflow_dispatch:
-  schedule:
-
-    - cron: "*/5 * * * *"
 
 jobs:
-  momentum:
+  telegram-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ejecutar detector
+      - name: Enviar prueba a Telegram
         env:
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python - <<'PY'
           import os
+          import urllib.parse
           import urllib.request
-          import json
-          import time
 
-          API_KEY = os.environ["FINNHUB_API_KEY"]
+          token = os.environ["TELEGRAM_BOT_TOKEN"]
+          chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
-          # Primera lista de prueba.
-          # Después ampliaremos el universo.
-          SYMBOLS = [
-              "AAPL",
-              "NVDA",
-              "AMD",
-              "AMZN",
-              "TSLA",
-              "META",
-              "MSFT",
-              "GOOGL",
-              "NFLX",
-              "AVGO"
-          ]
+          message = """🤖 MOMENTUM DETECTOR
 
-          print("🚨 MOMENTUM DETECTOR")
-          print("=" * 50)
+✅ Conexión funcionando correctamente.
 
-          for symbol in SYMBOLS:
-              try:
-                  url = (
-                      "https://finnhub.io/api/v1/quote"
-                      f"?symbol={symbol}&token={API_KEY}"
-                  )
+GitHub → Telegram → iPhone
 
-                  with urllib.request.urlopen(url, timeout=10) as response:
-                      data = json.load(response)
+El sistema está preparado para recibir alertas de mercado."""
 
-                  price = data.get("c")
-                  change = data.get("dp")
+          url = f"https://api.telegram.org/bot{token}/sendMessage"
 
-                  if price is None or change is None:
-                      print(f"{symbol}: sin datos")
-                      continue
+          data = urllib.parse.urlencode({
+              "chat_id": chat_id,
+              "text": message
+          }).encode()
 
-                  print(
-                      f"{symbol}: ${price:.2f} | "
-                      f"cambio diario: {change:.2f}%"
-                  )
+          request = urllib.request.Request(url, data=data)
 
-                  if change >= 10:
-                      print(
-                          f"🚨 MOMENTUM DETECTADO: "
-                          f"{symbol} +{change:.2f}%"
-                      )
+          with urllib.request.urlopen(request) as response:
+              result = response.read().decode()
 
-                  time.sleep(0.2)
-
-              except Exception as e:
-                  print(f"{symbol}: ERROR - {e}")
-
-          print("=" * 50)
-          print("Escaneo terminado.")
+          print("Telegram respondió:")
+          print(result)
           PY
