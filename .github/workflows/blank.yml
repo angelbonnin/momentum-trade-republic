@@ -122,9 +122,7 @@ jobs:
                       alerts += 1
 
               except Exception as e:
-                  print(f"⚠️ {symbol}: datos no disponibles ({e})")
-
-    continue
+                  print(f"⚠️ {symbol}: datos no disponibles ({e})") continue
 
           print("=" * 60)
           print(f"Alertas enviadas: {alerts}")
