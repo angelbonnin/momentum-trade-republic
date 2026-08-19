@@ -59,6 +59,8 @@ jobs:
           for symbol in SYMBOLS:
 
               try:
+              import time
+              time.sleep(8)
                   params = urllib.parse.urlencode({
                       "symbol": symbol,
                       "interval": "1min",
