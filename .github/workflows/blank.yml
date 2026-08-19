@@ -3,20 +3,14 @@ name: Momentum Detector
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "*/15 * * * *"
-
 jobs:
-  momentum:
+  diagnostic:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Escanear acciones
+      - name: Diagnosticar Twelve Data
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RUN_NUMBER: ${{ github.run_number }}
 
         run: |
           python - <<'PY'
@@ -26,101 +20,11 @@ jobs:
           import json
 
           API_KEY = os.environ["TWELVE_DATA_API_KEY"]
-          BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-          CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-          run_number = int(os.environ.get("RUN_NUMBER", "1"))
-
-          GROUPS = [
-              [
-                  "NVDA",
-                  "AMD",
-                  "TSLA",
-                  "PLTR",
-                  "COIN",
-                  "HOOD",
-                  "MSTR",
-                  "SMCI"
-              ],
-              [
-                  "APP",
-                  "ARM",
-                  "AVGO",
-                  "MU",
-                  "MRVL",
-                  "TSM",
-                  "QCOM",
-                  "INTC"
-              ],
-              [
-                  "AMZN",
-                  "META",
-                  "NFLX",
-                  "GOOG",
-                  "GOOGL",
-                  "AAPL",
-                  "MSFT",
-                  "AMAT"
-              ],
-              [
-                  "LRCX",
-                  "CRWD",
-                  "PANW",
-                  "SNOW",
-                  "DDOG",
-                  "NET",
-                  "RBLX",
-                  "SHOP"
-              ],
-              [
-                  "UBER",
-                  "ABNB",
-                  "MELI",
-                  "CVNA",
-                  "RIVN",
-                  "NIO",
-                  "SOFI",
-                  "MARA"
-              ]
-          ]
-
-          group_index = (run_number - 1) % len(GROUPS)
-          SYMBOLS = GROUPS[group_index]
-
-          print("🚨 MOMENTUM DETECTOR")
-          print("=" * 60)
-          print(f"Ejecución: {run_number}")
-          print(f"Grupo: {group_index + 1}/5")
-          print("Acciones analizadas:")
-          print(", ".join(SYMBOLS))
-          print("=" * 60)
-
-          def send_telegram(message):
-              url = (
-                  f"https://api.telegram.org/"
-                  f"bot{BOT_TOKEN}/sendMessage"
-              )
-
-              data = urllib.parse.urlencode({
-                  "chat_id": CHAT_ID,
-                  "text": message
-              }).encode()
-
-              request = urllib.request.Request(
-                  url,
-                  data=data
-              )
-
-              with urllib.request.urlopen(
-                  request,
-                  timeout=20
-              ) as response:
-                  return response.read().decode()
-
-          symbols_string = ",".join(SYMBOLS)
+          symbols = "NVDA,AMD,TSLA,PLTR,COIN,HOOD,MSTR,SMCI"
 
           params = urllib.parse.urlencode({
-              "symbol": symbols_string,
+              "symbol": symbols,
               "interval": "1min",
               "outputsize": "61",
               "apikey": API_KEY
@@ -131,183 +35,56 @@ jobs:
               + params
           )
 
-          request = urllib.request.Request(
-              url,
-              headers={
-                  "User-Agent": "MomentumDetector/1.0"
-              }
-          )
+          print("Consultando Twelve Data...")
+          print("Símbolos:", symbols)
+          print()
 
           try:
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent": "MomentumDetector/1.0"
+                  }
+              )
 
               with urllib.request.urlopen(
                   request,
                   timeout=30
               ) as response:
-                  data = json.load(response)
+
+                  raw = response.read().decode()
+
+              print("Respuesta recibida:")
+              print(raw)
+
+              print()
+              print("=" * 60)
+
+              data = json.loads(raw)
+
+              print("Tipo de respuesta:")
+              print(type(data))
+
+              print()
+              print("Claves principales:")
+
+              if isinstance(data, dict):
+
+                  print(
+                      list(data.keys())[:30]
+                  )
+
+              print()
+              print("Diagnóstico terminado.")
 
           except Exception as e:
 
-              print("❌ Error consultando Twelve Data:")
-              print(e)
+              print()
+              print("❌ ERROR:")
+              print(type(e).__name__)
+              print(str(e))
+
               raise SystemExit(1)
 
-          alerts = 0
-          errors = 0
-
-          for symbol in SYMBOLS:
-
-              try:
-
-                  if symbol not in data:
-
-                      print(
-                          f"⚠️ {symbol}: "
-                          "sin datos"
-                      )
-
-                      errors += 1
-                      continue
-
-                  symbol_data = data[symbol]
-
-                  if "values" not in symbol_data:
-
-                      print(
-                          f"⚠️ {symbol}: "
-                          "datos no disponibles"
-                      )
-
-                      errors += 1
-                      continue
-
-                  values = symbol_data["values"]
-
-                  if len(values) < 61:
-
-                      print(
-                          f"⚠️ {symbol}: "
-                          f"solo {len(values)} velas"
-                      )
-
-                      errors += 1
-                      continue
-
-                  current_price = float(
-                      values[0]["close"]
-                  )
-
-                  old_price = float(
-                      values[60]["close"]
-                  )
-
-                  change = (
-                      (current_price - old_price)
-                      / old_price
-                  ) * 100
-
-                  volumes = []
-
-                  for candle in values:
-
-                      if "volume" in candle:
-
-                          try:
-                              volumes.append(
-                                  float(candle["volume"])
-                              )
-                          except:
-                              pass
-
-                  if len(volumes) < 2:
-
-                      print(
-                          f"{symbol}: "
-                          "sin datos de volumen"
-                      )
-
-                      continue
-
-                  current_volume = volumes[0]
-
-                  historical_volumes = volumes[1:]
-
-                  average_volume = (
-                      sum(historical_volumes)
-                      / len(historical_volumes)
-                  )
-
-                  if average_volume > 0:
-
-                      volume_ratio = (
-                          current_volume
-                          / average_volume
-                      )
-
-                  else:
-
-                      volume_ratio = 0
-
-                  print(
-                      f"{symbol}: "
-                      f"${current_price:.2f} | "
-                      f"60m: {change:+.2f}% | "
-                      f"Volumen: "
-                      f"{volume_ratio:.1f}x"
-                  )
-
-                  if (
-                      change >= 10
-                      and volume_ratio >= 3
-                  ):
-
-                      message = (
-                          "🚨 MOMENTUM DETECTADO 🚨\n\n"
-                          f"📈 Acción: {symbol}\n"
-                          f"💰 Precio: "
-                          f"${current_price:.2f}\n"
-                          f"📊 Movimiento 60 min: "
-                          f"+{change:.2f}%\n"
-                          f"🔥 Volumen: "
-                          f"{volume_ratio:.1f}x "
-                          "la media\n\n"
-                          "⚠️ Señal de momentum. "
-                          "No es una recomendación "
-                          "automática de compra."
-                      )
-
-                      try:
-
-                          send_telegram(message)
-
-                          print(
-                              f"📱 ALERTA ENVIADA: "
-                              f"{symbol}"
-                          )
-
-                          alerts += 1
-
-                      except Exception as e:
-
-                          print(
-                              f"❌ Error Telegram: "
-                              f"{e}"
-                          )
-
-              except Exception as e:
-
-                  print(
-                      f"⚠️ {symbol}: ERROR - {e}"
-                  )
-
-                  errors += 1
-
-          print("=" * 60)
-          print(
-              f"Alertas enviadas: {alerts}"
-          )
-          print(
-              f"Acciones con errores: {errors}"
-          )
-          print("Escaneo terminado.")
           PY
