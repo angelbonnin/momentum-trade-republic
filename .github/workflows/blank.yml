@@ -53,7 +53,10 @@ jobs:
                   data=data
               )
 
-              with urllib.request.urlopen(request, timeout=15) as response:
+              with urllib.request.urlopen(
+                  request,
+                  timeout=15
+              ) as response:
                   return response.read().decode()
 
           print("🚨 MOMENTUM DETECTOR")
@@ -65,7 +68,6 @@ jobs:
           for symbol in SYMBOLS:
 
               try:
-                  # Esperamos entre peticiones para evitar HTTP 429
                   time.sleep(8)
 
                   params = urllib.parse.urlencode({
@@ -95,8 +97,7 @@ jobs:
 
                   if "values" not in data:
                       print(
-                          f"⚠️ {symbol}: "
-                          f"sin datos disponibles"
+                          f"⚠️ {symbol}: sin datos"
                       )
                       errors += 1
                       continue
@@ -106,8 +107,7 @@ jobs:
                   if len(values) < 61:
                       print(
                           f"⚠️ {symbol}: "
-                          f"datos insuficientes "
-                          f"({len(values)} velas)"
+                          f"datos insuficientes"
                       )
                       errors += 1
                       continue
@@ -125,37 +125,76 @@ jobs:
                       / old_price
                   ) * 100
 
+                  volumes = []
+
+                  for candle in values:
+                      if "volume" in candle:
+                          volumes.append(
+                              float(candle["volume"])
+                          )
+
+                  if len(volumes) < 2:
+                      print(
+                          f"{symbol}: "
+                          f"sin datos de volumen"
+                      )
+                      continue
+
+                  current_volume = volumes[0]
+
+                  average_volume = (
+                      sum(volumes[1:])
+                      / len(volumes[1:])
+                  )
+
+                  if average_volume > 0:
+                      volume_ratio = (
+                          current_volume
+                          / average_volume
+                      )
+                  else:
+                      volume_ratio = 0
+
                   print(
                       f"{symbol}: "
                       f"${current_price:.2f} | "
-                      f"60 min: {change:+.2f}%"
+                      f"60m: {change:+.2f}% | "
+                      f"Volumen: {volume_ratio:.1f}x"
                   )
 
-                  if change >= 10:
+                  if (
+                      change >= 10
+                      and volume_ratio >= 3
+                  ):
 
                       message = (
                           "🚨 MOMENTUM DETECTADO 🚨\n\n"
                           f"📈 Acción: {symbol}\n"
-                          f"💰 Precio: ${current_price:.2f}\n"
-                          f"📊 Movimiento 60 min: "
-                          f"+{change:.2f}%\n\n"
-                          "⚠️ No es una recomendación "
-                          "automática de compra."
+                          f"💰 Precio: "
+                          f"${current_price:.2f}\n"
+                          f"📊 60 minutos: "
+                          f"+{change:.2f}%\n"
+                          f"🔥 Volumen: "
+                          f"{volume_ratio:.1f}x "
+                          f"la media\n\n"
+                          "⚠️ Señal de momentum, "
+                          "NO recomendación automática "
+                          "de compra."
                       )
 
                       try:
                           send_telegram(message)
 
                           print(
-                              f"📱 ALERTA ENVIADA: {symbol}"
+                              f"📱 ALERTA ENVIADA: "
+                              f"{symbol}"
                           )
 
                           alerts += 1
 
                       except Exception as telegram_error:
                           print(
-                              f"❌ Error Telegram "
-                              f"{symbol}: "
+                              f"❌ Error Telegram: "
                               f"{telegram_error}"
                           )
 
