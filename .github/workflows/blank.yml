@@ -4,15 +4,43 @@ on:
   workflow_dispatch:
 
 jobs:
-  telegram-test:
+  intraday-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Enviar prueba a Telegram
+      - name: Probar datos intradía
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=🤖 MOMENTUM DETECTOR - Conexión correcta. GitHub → Telegram → iPhone ✅"
+          python - <<'PY'
+          import os
+          import urllib.request
+          import json
+          import time
+
+          token = os.environ["FINNHUB_API_KEY"]
+
+          now = int(time.time())
+          start = now - 7200
+
+          url = (
+              "https://finnhub.io/api/v1/stock/candle"
+              f"?symbol=NVDA"
+              f"&resolution=1"
+              f"&from={start}"
+              f"&to={now}"
+              f"&token={token}"
+          )
+
+          with urllib.request.urlopen(url) as response:
+              data = json.load(response)
+
+          print("Respuesta Finnhub:")
+          print(json.dumps(data, indent=2))
+
+          if data.get("s") == "ok":
+              print("✅ DATOS INTRADÍA FUNCIONANDO")
+              print("Velas recibidas:", len(data.get("c", [])))
+          else:
+              print("❌ No se recibieron datos intradía")
+          PY
