@@ -16,6 +16,7 @@ jobs:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_NUMBER: ${{ github.run_number }}
 
         run: |
           python - <<'PY'
@@ -28,19 +29,77 @@ jobs:
           BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
           CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-          SYMBOLS = [
-              "NVDA",
-              "AMD",
-              "TSLA",
-              "PLTR",
-              "COIN",
-              "HOOD",
-              "MSTR",
-              "SMCI"
+          run_number = int(os.environ.get("RUN_NUMBER", "1"))
+
+          GROUPS = [
+              [
+                  "NVDA",
+                  "AMD",
+                  "TSLA",
+                  "PLTR",
+                  "COIN",
+                  "HOOD",
+                  "MSTR",
+                  "SMCI"
+              ],
+              [
+                  "APP",
+                  "ARM",
+                  "AVGO",
+                  "MU",
+                  "MRVL",
+                  "TSM",
+                  "QCOM",
+                  "INTC"
+              ],
+              [
+                  "AMZN",
+                  "META",
+                  "NFLX",
+                  "GOOG",
+                  "GOOGL",
+                  "AAPL",
+                  "MSFT",
+                  "AMAT"
+              ],
+              [
+                  "LRCX",
+                  "CRWD",
+                  "PANW",
+                  "SNOW",
+                  "DDOG",
+                  "NET",
+                  "RBLX",
+                  "SHOP"
+              ],
+              [
+                  "UBER",
+                  "ABNB",
+                  "MELI",
+                  "CVNA",
+                  "RIVN",
+                  "NIO",
+                  "SOFI",
+                  "MARA"
+              ]
           ]
 
+          group_index = (run_number - 1) % len(GROUPS)
+          SYMBOLS = GROUPS[group_index]
+
+          print("🚨 MOMENTUM DETECTOR")
+          print("=" * 60)
+          print(f"Ejecución: {run_number}")
+          print(f"Grupo: {group_index + 1}/5")
+          print("Acciones analizadas:")
+          print(", ".join(SYMBOLS))
+          print("=" * 60)
+
           def send_telegram(message):
-              url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+              url = (
+                  f"https://api.telegram.org/"
+                  f"bot{BOT_TOKEN}/sendMessage"
+              )
 
               data = urllib.parse.urlencode({
                   "chat_id": CHAT_ID,
@@ -57,9 +116,6 @@ jobs:
                   timeout=20
               ) as response:
                   return response.read().decode()
-
-          print("🚨 MOMENTUM DETECTOR")
-          print("=" * 60)
 
           symbols_string = ",".join(SYMBOLS)
 
@@ -103,8 +159,6 @@ jobs:
 
               try:
 
-                  # Twelve Data puede devolver los símbolos
-                  # como claves independientes en una respuesta batch.
                   if symbol not in data:
 
                       print(
@@ -158,24 +212,29 @@ jobs:
 
                       if "volume" in candle:
 
-                          volumes.append(
-                              float(candle["volume"])
-                          )
+                          try:
+                              volumes.append(
+                                  float(candle["volume"])
+                              )
+                          except:
+                              pass
 
                   if len(volumes) < 2:
 
                       print(
                           f"{symbol}: "
-                          "sin volumen"
+                          "sin datos de volumen"
                       )
 
                       continue
 
                   current_volume = volumes[0]
 
+                  historical_volumes = volumes[1:]
+
                   average_volume = (
-                      sum(volumes[1:])
-                      / len(volumes[1:])
+                      sum(historical_volumes)
+                      / len(historical_volumes)
                   )
 
                   if average_volume > 0:
@@ -207,7 +266,7 @@ jobs:
                           f"📈 Acción: {symbol}\n"
                           f"💰 Precio: "
                           f"${current_price:.2f}\n"
-                          f"📊 60 minutos: "
+                          f"📊 Movimiento 60 min: "
                           f"+{change:.2f}%\n"
                           f"🔥 Volumen: "
                           f"{volume_ratio:.1f}x "
@@ -244,14 +303,11 @@ jobs:
                   errors += 1
 
           print("=" * 60)
-
           print(
               f"Alertas enviadas: {alerts}"
           )
-
           print(
               f"Acciones con errores: {errors}"
           )
-
           print("Escaneo terminado.")
           PY
