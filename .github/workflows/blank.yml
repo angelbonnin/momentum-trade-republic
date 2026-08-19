@@ -11,7 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Detectar momentum
+      - name: Descargar estado anterior
+        uses: actions/cache/restore@v4
+        with:
+          path: momentum_state.json
+          key: momentum-state-${{ github.run_id }}
+          restore-keys: |
+            momentum-state-
+
+      - name: Ejecutar detector
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -29,7 +37,9 @@ jobs:
           BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
           CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-          run_number = int(os.environ.get("RUN_NUMBER", "1"))
+          run_number = int(
+              os.environ.get("RUN_NUMBER", "1")
+          )
 
           GROUPS = [
               ["NVDA", "AMD", "TSLA", "PLTR", "COIN", "HOOD", "MSTR", "SMCI"],
@@ -41,6 +51,21 @@ jobs:
 
           group_index = (run_number - 1) % 5
           symbols = GROUPS[group_index]
+
+          # ------------------------------------------
+          # CARGAR ESTADO
+          # ------------------------------------------
+
+          state_file = "momentum_state.json"
+
+          try:
+
+              with open(state_file, "r") as f:
+                  state = json.load(f)
+
+          except:
+
+              state = {}
 
           print("=" * 60)
           print("🚨 MOMENTUM DETECTOR")
@@ -70,9 +95,13 @@ jobs:
                   request,
                   timeout=20
               ) as response:
+
                   return response.read().decode()
 
-          # CONSULTA
+          # ------------------------------------------
+          # TWELVE DATA
+          # ------------------------------------------
+
           params = urllib.parse.urlencode({
               "symbol": ",".join(symbols),
               "interval": "1min",
@@ -104,55 +133,74 @@ jobs:
           except Exception as error:
 
               print("❌ Error Twelve Data:")
-              print(type(error).__name__)
-              print(str(error))
+              print(error)
               raise SystemExit(1)
 
           alerts = 0
           errors = 0
+
+          # ------------------------------------------
+          # ANALIZAR
+          # ------------------------------------------
 
           for symbol in symbols:
 
               try:
 
                   if symbol not in data:
-                      print(f"❌ {symbol}: no recibido")
+
+                      print(
+                          f"❌ {symbol}: "
+                          "no recibido"
+                      )
+
                       errors += 1
                       continue
 
                   symbol_data = data[symbol]
 
                   if "values" not in symbol_data:
-                      print(f"❌ {symbol}: sin velas")
+
+                      print(
+                          f"❌ {symbol}: "
+                          "sin velas"
+                      )
+
                       errors += 1
                       continue
 
                   values = symbol_data["values"]
 
                   if len(values) < 61:
+
                       print(
                           f"❌ {symbol}: "
-                          f"{len(values)} velas"
+                          "datos insuficientes"
                       )
+
                       errors += 1
                       continue
 
-                  # PRECIO ACTUAL
+                  # PRECIO
+
                   current_price = float(
                       values[0]["close"]
                   )
 
-                  # PRECIO HACE 60 MINUTOS
                   old_price = float(
                       values[60]["close"]
                   )
 
                   change = (
-                      (current_price - old_price)
+                      (
+                          current_price
+                          - old_price
+                      )
                       / old_price
                   ) * 100
 
                   # VOLUMEN
+
                   volumes = []
 
                   for candle in values:
@@ -160,10 +208,13 @@ jobs:
                       if "volume" in candle:
 
                           try:
+
                               volumes.append(
                                   float(candle["volume"])
                               )
+
                           except:
+
                               pass
 
                   if len(volumes) >= 2:
@@ -193,53 +244,121 @@ jobs:
                       volume_ratio = 0
 
                   print(
-                      f"✅ {symbol} | "
+                      f"{symbol}: "
                       f"${current_price:.2f} | "
                       f"60m: {change:+.2f}% | "
                       f"Vol: {volume_ratio:.1f}x"
                   )
 
-                  # ALERTA
-                  if (
+                  # --------------------------------
+                  # CONDICIONES
+                  # --------------------------------
+
+                  momentum = (
                       change >= 10
                       and volume_ratio >= 3
-                  ):
+                  )
 
-                      message = (
-                          "🚨 MOMENTUM DETECTADO 🚨\n\n"
-                          f"📈 {symbol}\n"
-                          f"💰 ${current_price:.2f}\n"
-                          f"📊 +{change:.2f}% "
-                          "en 60 minutos\n"
-                          f"🔥 Volumen: "
-                          f"{volume_ratio:.1f}x\n\n"
-                          "⚠️ Señal de momentum. "
-                          "No es recomendación de compra."
-                      )
+                  already_alerted = (
+                      state.get(symbol, False)
+                  )
 
-                      send_telegram(message)
+                  # --------------------------------
+                  # NUEVA ALERTA
+                  # --------------------------------
 
-                      print(
-                          f"📱 ALERTA TELEGRAM: {symbol}"
-                      )
+                  if momentum:
 
-                      alerts += 1
+                      if not already_alerted:
+
+                          message = (
+                              "🚨 MOMENTUM DETECTADO 🚨\n\n"
+                              f"📈 {symbol}\n"
+                              f"💰 ${current_price:.2f}\n"
+                              f"📊 +{change:.2f}% "
+                              "en 60 minutos\n"
+                              f"🔥 Volumen: "
+                              f"{volume_ratio:.1f}x\n\n"
+                              "⚠️ Señal de momentum. "
+                              "No es recomendación "
+                              "automática de compra."
+                          )
+
+                          try:
+
+                              send_telegram(
+                                  message
+                              )
+
+                              print(
+                                  f"📱 NUEVA ALERTA: "
+                                  f"{symbol}"
+                              )
+
+                              state[symbol] = True
+                              alerts += 1
+
+                          except Exception as error:
+
+                              print(
+                                  f"❌ Telegram: "
+                                  f"{error}"
+                              )
+
+                      else:
+
+                          print(
+                              f"🔕 {symbol}: "
+                              "alerta ya enviada"
+                          )
+
+                  # --------------------------------
+                  # LIBERAR ALERTA
+                  # --------------------------------
+
+                  else:
+
+                      if already_alerted:
+
+                          state[symbol] = False
+
+                          print(
+                              f"🔄 {symbol}: "
+                              "momentum finalizado"
+                          )
 
               except Exception as error:
 
                   print(
                       f"⚠️ {symbol}: "
-                      f"{type(error).__name__}: "
                       f"{error}"
                   )
 
                   errors += 1
 
+          # ------------------------------------------
+          # GUARDAR ESTADO
+          # ------------------------------------------
+
+          with open(state_file, "w") as f:
+
+              json.dump(
+                  state,
+                  f,
+                  indent=2
+              )
+
           print("=" * 60)
-          print(f"Alertas: {alerts}")
+          print(f"Alertas nuevas: {alerts}")
           print(f"Errores: {errors}")
-          print(f"Grupo: {group_index + 1}/5")
-          print("✅ Escaneo terminado")
+          print("Estado guardado")
+          print("Escaneo terminado")
           print("=" * 60)
 
           PY
+
+      - name: Guardar estado
+        uses: actions/cache/save@v4
+        with:
+          path: momentum_state.json
+          key: momentum-state-${{ github.run_id }}
