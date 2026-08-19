@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-finnhub:
+  momentum:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Probar conexión con Finnhub
+      - name: Ejecutar detector
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
@@ -16,15 +16,61 @@ jobs:
           import os
           import urllib.request
           import json
+          import time
 
-          api_key = os.environ["FINNHUB_API_KEY"]
+          API_KEY = os.environ["FINNHUB_API_KEY"]
 
-          url = f"https://finnhub.io/api/v1/quote?symbol=AAPL&token={api_key}"
+          # Primera lista de prueba.
+          # Después ampliaremos el universo.
+          SYMBOLS = [
+              "AAPL",
+              "NVDA",
+              "AMD",
+              "AMZN",
+              "TSLA",
+              "META",
+              "MSFT",
+              "GOOGL",
+              "NFLX",
+              "AVGO"
+          ]
 
-          with urllib.request.urlopen(url) as response:
-              data = json.load(response)
+          print("🚨 MOMENTUM DETECTOR")
+          print("=" * 50)
 
-          print("✅ Conexión con Finnhub correcta")
-          print("AAPL precio:", data.get("c"))
-          print("AAPL cambio:", data.get("dp"), "%")
+          for symbol in SYMBOLS:
+              try:
+                  url = (
+                      "https://finnhub.io/api/v1/quote"
+                      f"?symbol={symbol}&token={API_KEY}"
+                  )
+
+                  with urllib.request.urlopen(url, timeout=10) as response:
+                      data = json.load(response)
+
+                  price = data.get("c")
+                  change = data.get("dp")
+
+                  if price is None or change is None:
+                      print(f"{symbol}: sin datos")
+                      continue
+
+                  print(
+                      f"{symbol}: ${price:.2f} | "
+                      f"cambio diario: {change:.2f}%"
+                  )
+
+                  if change >= 10:
+                      print(
+                          f"🚨 MOMENTUM DETECTADO: "
+                          f"{symbol} +{change:.2f}%"
+                      )
+
+                  time.sleep(0.2)
+
+              except Exception as e:
+                  print(f"{symbol}: ERROR - {e}")
+
+          print("=" * 50)
+          print("Escaneo terminado.")
           PY
