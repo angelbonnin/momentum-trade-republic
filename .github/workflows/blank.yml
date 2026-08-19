@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  twelve-test:
+  momentum-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Probar Twelve Data
+      - name: Detectar momentum
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
         run: |
@@ -18,33 +18,86 @@ jobs:
           import urllib.request
           import json
 
-          api_key = os.environ["TWELVE_DATA_API_KEY"]
+          API_KEY = os.environ["TWELVE_DATA_API_KEY"]
 
-          params = urllib.parse.urlencode({
-              "symbol": "NVDA",
-              "interval": "1min",
-              "outputsize": "10",
-              "apikey": api_key
-          })
+          SYMBOLS = [
+              "NVDA",
+              "AMD",
+              "TSLA",
+              "AAPL",
+              "AMZN",
+              "META",
+              "NFLX",
+              "AVGO",
+              "PLTR",
+              "COIN"
+          ]
 
-          url = "https://api.twelvedata.com/time_series?" + params
+          print("🚨 MOMENTUM DETECTOR")
+          print("=" * 60)
 
-          request = urllib.request.Request(
-              url,
-              headers={"User-Agent": "MomentumDetector/1.0"}
-          )
+          for symbol in SYMBOLS:
 
-          with urllib.request.urlopen(request) as response:
-              data = json.load(response)
+              try:
+                  params = urllib.parse.urlencode({
+                      "symbol": symbol,
+                      "interval": "1min",
+                      "outputsize": "61",
+                      "apikey": API_KEY
+                  })
 
-          if "values" in data:
-              print("✅ TWELVE DATA FUNCIONANDO")
-              print("Velas recibidas:", len(data["values"]))
-              print()
-              print("Última vela:")
-              print(data["values"][0])
-          else:
-              print("❌ Twelve Data respondió con un error:")
-              print(json.dumps(data, indent=2))
-              raise SystemExit(1)
+                  url = (
+                      "https://api.twelvedata.com/time_series?"
+                      + params
+                  )
+
+                  request = urllib.request.Request(
+                      url,
+                      headers={"User-Agent": "MomentumDetector/1.0"}
+                  )
+
+                  with urllib.request.urlopen(request) as response:
+                      data = json.load(response)
+
+                  if "values" not in data:
+                      print(f"{symbol}: sin datos")
+                      continue
+
+                  values = data["values"]
+
+                  if len(values) < 61:
+                      print(
+                          f"{symbol}: solo {len(values)} velas disponibles"
+                      )
+                      continue
+
+                  current_price = float(values[0]["close"])
+                  old_price = float(values[60]["close"])
+
+                  change = (
+                      (current_price - old_price)
+                      / old_price
+                  ) * 100
+
+                  print(
+                      f"{symbol}: "
+                      f"${current_price:.2f} | "
+                      f"60 min: {change:+.2f}%"
+                  )
+
+                  if change >= 10:
+
+                      print()
+                      print("🚨🚨🚨 MOMENTUM DETECTADO 🚨🚨🚨")
+                      print(f"Acción: {symbol}")
+                      print(f"Precio: ${current_price:.2f}")
+                      print(f"Movimiento 60 min: +{change:.2f}%")
+                      print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+                      print()
+
+              except Exception as e:
+                  print(f"{symbol}: ERROR - {e}")
+
+          print("=" * 60)
+          print("Escaneo terminado.")
           PY
