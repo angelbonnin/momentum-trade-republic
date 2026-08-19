@@ -2,8 +2,8 @@ name: Momentum Detector
 
 on:
   workflow_dispatch:
-  schedule:
 
+  schedule:
     - cron: "*/15 * * * *"
 
 jobs:
@@ -16,12 +16,14 @@ jobs:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
         run: |
           python - <<'PY'
           import os
           import urllib.parse
           import urllib.request
           import json
+          import time
 
           API_KEY = os.environ["TWELVE_DATA_API_KEY"]
           BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -46,21 +48,26 @@ jobs:
                   "text": message
               }).encode()
 
-              request = urllib.request.Request(url, data=data)
+              request = urllib.request.Request(
+                  url,
+                  data=data
+              )
 
-              with urllib.request.urlopen(request) as response:
+              with urllib.request.urlopen(request, timeout=15) as response:
                   return response.read().decode()
 
           print("🚨 MOMENTUM DETECTOR")
           print("=" * 60)
 
           alerts = 0
+          errors = 0
 
           for symbol in SYMBOLS:
 
               try:
-              import time
-              time.sleep(8)
+                  # Esperamos entre peticiones para evitar HTTP 429
+                  time.sleep(8)
+
                   params = urllib.parse.urlencode({
                       "symbol": symbol,
                       "interval": "1min",
@@ -75,24 +82,43 @@ jobs:
 
                   request = urllib.request.Request(
                       url,
-                      headers={"User-Agent": "MomentumDetector/1.0"}
+                      headers={
+                          "User-Agent": "MomentumDetector/1.0"
+                      }
                   )
 
-                  with urllib.request.urlopen(request) as response:
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=20
+                  ) as response:
                       data = json.load(response)
 
                   if "values" not in data:
-                      print(f"{symbol}: sin datos")
+                      print(
+                          f"⚠️ {symbol}: "
+                          f"sin datos disponibles"
+                      )
+                      errors += 1
                       continue
 
                   values = data["values"]
 
                   if len(values) < 61:
-                      print(f"{symbol}: datos insuficientes")
+                      print(
+                          f"⚠️ {symbol}: "
+                          f"datos insuficientes "
+                          f"({len(values)} velas)"
+                      )
+                      errors += 1
                       continue
 
-                  current_price = float(values[0]["close"])
-                  old_price = float(values[60]["close"])
+                  current_price = float(
+                      values[0]["close"]
+                  )
+
+                  old_price = float(
+                      values[60]["close"]
+                  )
 
                   change = (
                       (current_price - old_price)
@@ -111,23 +137,42 @@ jobs:
                           "🚨 MOMENTUM DETECTADO 🚨\n\n"
                           f"📈 Acción: {symbol}\n"
                           f"💰 Precio: ${current_price:.2f}\n"
-                          f"📊 Movimiento 60 min: +{change:.2f}%\n\n"
-                          "⚠️ No es una recomendación automática de compra."
+                          f"📊 Movimiento 60 min: "
+                          f"+{change:.2f}%\n\n"
+                          "⚠️ No es una recomendación "
+                          "automática de compra."
                       )
 
-                      send_telegram(message)
+                      try:
+                          send_telegram(message)
 
-                      print(
-                          f"📱 ALERTA ENVIADA A TELEGRAM: {symbol}"
-                      )
+                          print(
+                              f"📱 ALERTA ENVIADA: {symbol}"
+                          )
 
-                      alerts += 1
+                          alerts += 1
+
+                      except Exception as telegram_error:
+                          print(
+                              f"❌ Error Telegram "
+                              f"{symbol}: "
+                              f"{telegram_error}"
+                          )
 
               except Exception as e:
-                  print(f"⚠️ {symbol}: datos no disponibles ({e})")
+                  print(
+                      f"⚠️ {symbol}: "
+                      f"datos no disponibles ({e})"
+                  )
+                  errors += 1
                   continue
 
           print("=" * 60)
-          print(f"Alertas enviadas: {alerts}")
+          print(
+              f"Alertas enviadas: {alerts}"
+          )
+          print(
+              f"Acciones con errores: {errors}"
+          )
           print("Escaneo terminado.")
           PY
