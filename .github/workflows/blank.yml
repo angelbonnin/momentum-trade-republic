@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Diagnosticar Twelve Data
+      - name: Comprobar datos de Twelve Data
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
 
@@ -21,10 +21,19 @@ jobs:
 
           API_KEY = os.environ["TWELVE_DATA_API_KEY"]
 
-          symbols = "NVDA,AMD,TSLA,PLTR,COIN,HOOD,MSTR,SMCI"
+          SYMBOLS = [
+              "NVDA",
+              "AMD",
+              "TSLA",
+              "PLTR",
+              "COIN",
+              "HOOD",
+              "MSTR",
+              "SMCI"
+          ]
 
           params = urllib.parse.urlencode({
-              "symbol": symbols,
+              "symbol": ",".join(SYMBOLS),
               "interval": "1min",
               "outputsize": "61",
               "apikey": API_KEY
@@ -35,56 +44,56 @@ jobs:
               + params
           )
 
-          print("Consultando Twelve Data...")
-          print("Símbolos:", symbols)
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "User-Agent": "MomentumDetector/1.0"
+              }
+          )
+
+          with urllib.request.urlopen(
+              request,
+              timeout=30
+          ) as response:
+
+              data = json.load(response)
+
+          print()
+          print("==========================================")
+          print("      RESULTADO TWELVE DATA")
+          print("==========================================")
           print()
 
-          try:
+          for symbol in SYMBOLS:
 
-              request = urllib.request.Request(
-                  url,
-                  headers={
-                      "User-Agent": "MomentumDetector/1.0"
-                  }
-              )
-
-              with urllib.request.urlopen(
-                  request,
-                  timeout=30
-              ) as response:
-
-                  raw = response.read().decode()
-
-              print("Respuesta recibida:")
-              print(raw)
-
-              print()
-              print("=" * 60)
-
-              data = json.loads(raw)
-
-              print("Tipo de respuesta:")
-              print(type(data))
-
-              print()
-              print("Claves principales:")
-
-              if isinstance(data, dict):
+              if symbol not in data:
 
                   print(
-                      list(data.keys())[:30]
+                      f"❌ {symbol} → NO RECIBIDO"
                   )
 
-              print()
-              print("Diagnóstico terminado.")
+                  continue
 
-          except Exception as e:
+              symbol_data = data[symbol]
 
-              print()
-              print("❌ ERROR:")
-              print(type(e).__name__)
-              print(str(e))
+              if "values" not in symbol_data:
 
-              raise SystemExit(1)
+                  print(
+                      f"⚠️ {symbol} → "
+                      "RECIBIDO PERO SIN VELAS"
+                  )
 
+                  continue
+
+              values = symbol_data["values"]
+
+              print(
+                  f"✅ {symbol} → "
+                  f"{len(values)} velas"
+              )
+
+          print()
+          print("==========================================")
+          print("Diagnóstico terminado correctamente.")
+          print("==========================================")
           PY
