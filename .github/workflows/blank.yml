@@ -4,9 +4,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  test-finnhub:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Comprobar funcionamiento
-        run: echo "🚨 MOMENTUM DETECTOR funcionando correctamente"
+      - name: Probar conexión con Finnhub
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          import urllib.request
+          import json
+
+          api_key = os.environ["FINNHUB_API_KEY"]
+
+          url = f"https://finnhub.io/api/v1/quote?symbol=AAPL&token={api_key}"
+
+          with urllib.request.urlopen(url) as response:
+              data = json.load(response)
+
+          print("✅ Conexión con Finnhub correcta")
+          print("AAPL precio:", data.get("c"))
+          print("AAPL cambio:", data.get("dp"), "%")
+          PY
