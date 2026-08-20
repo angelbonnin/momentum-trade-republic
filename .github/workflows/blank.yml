@@ -37,59 +37,29 @@ jobs:
           )
 
           # ==========================================
-          # GRUPOS
+          # ACCIONES
           # ==========================================
 
           GROUPS = [
               [
-                  "NVDA",
-                  "AMD",
-                  "TSLA",
-                  "PLTR",
-                  "COIN",
-                  "HOOD",
-                  "MSTR",
-                  "SMCI"
+                  "NVDA", "AMD", "TSLA", "PLTR",
+                  "COIN", "HOOD", "MSTR", "SMCI"
               ],
               [
-                  "APP",
-                  "ARM",
-                  "AVGO",
-                  "MU",
-                  "MRVL",
-                  "TSM",
-                  "QCOM",
-                  "INTC"
+                  "APP", "ARM", "AVGO", "MU",
+                  "MRVL", "TSM", "QCOM", "INTC"
               ],
               [
-                  "AMZN",
-                  "META",
-                  "NFLX",
-                  "GOOG",
-                  "GOOGL",
-                  "AAPL",
-                  "MSFT",
-                  "AMAT"
+                  "AMZN", "META", "NFLX", "GOOG",
+                  "GOOGL", "AAPL", "MSFT", "AMAT"
               ],
               [
-                  "LRCX",
-                  "CRWD",
-                  "PANW",
-                  "SNOW",
-                  "DDOG",
-                  "NET",
-                  "RBLX",
-                  "SHOP"
+                  "LRCX", "CRWD", "PANW", "SNOW",
+                  "DDOG", "NET", "RBLX", "SHOP"
               ],
               [
-                  "UBER",
-                  "ABNB",
-                  "MELI",
-                  "CVNA",
-                  "RIVN",
-                  "NIO",
-                  "SOFI",
-                  "MARA"
+                  "UBER", "ABNB", "MELI", "CVNA",
+                  "RIVN", "NIO", "SOFI", "MARA"
               ]
           ]
 
@@ -101,11 +71,11 @@ jobs:
           symbols = GROUPS[group_index]
 
           print("=" * 60)
-          print("🚨 OPPORTUNITY SCANNER")
+          print("🚨 OPPORTUNITY SCANNER V3")
           print("=" * 60)
           print(
-              f"Grupo: "
-              f"{group_index + 1}/5"
+              f"Grupo: {group_index + 1}/"
+              f"{len(GROUPS)}"
           )
           print(
               "Acciones: "
@@ -142,6 +112,169 @@ jobs:
                   return response.read().decode()
 
           # ==========================================
+          # CLASIFICADOR DE CATALIZADORES
+          # ==========================================
+
+          STRONG_KEYWORDS = [
+              "fda",
+              "approval",
+              "approved",
+              "clinical trial",
+              "clinical study",
+              "phase 1",
+              "phase 2",
+              "phase 3",
+              "trial results",
+              "positive results",
+              "earnings",
+              "quarterly results",
+              "revenue",
+              "guidance",
+              "acquisition",
+              "acquire",
+              "merger",
+              "contract",
+              "major contract",
+              "partnership",
+              "agreement",
+              "deal",
+              "regulatory",
+              "drug approval",
+              "drug candidate",
+              "buyback",
+              "share repurchase",
+              "product launch"
+          ]
+
+          MEDIUM_KEYWORDS = [
+              "upgrade",
+              "downgrade",
+              "price target",
+              "analyst",
+              "expansion",
+              "collaboration",
+              "investment",
+              "forecast",
+              "outlook",
+              "presentation"
+          ]
+
+          def classify_news(article):
+
+              title = (
+                  article.get("title", "")
+                  or ""
+              ).lower()
+
+              description = (
+                  article.get("description", "")
+                  or ""
+              ).lower()
+
+              snippet = (
+                  article.get("snippet", "")
+                  or ""
+              ).lower()
+
+              text = (
+                  title
+                  + " "
+                  + description
+                  + " "
+                  + snippet
+              )
+
+              strong_matches = []
+
+              medium_matches = []
+
+              for keyword in STRONG_KEYWORDS:
+
+                  if keyword in text:
+
+                      strong_matches.append(
+                          keyword
+                      )
+
+              for keyword in MEDIUM_KEYWORDS:
+
+                  if keyword in text:
+
+                      medium_matches.append(
+                          keyword
+                      )
+
+              sentiment = 0
+
+              entities = article.get(
+                  "entities",
+                  []
+              )
+
+              for entity in entities:
+
+                  symbol = entity.get(
+                      "symbol",
+                      ""
+                  )
+
+                  if symbol:
+
+                      sentiment_value = (
+                          entity.get(
+                              "sentiment_score"
+                          )
+                      )
+
+                      if sentiment_value is not None:
+
+                          try:
+
+                              sentiment = float(
+                                  sentiment_value
+                              )
+
+                              break
+
+                          except:
+
+                              pass
+
+              if strong_matches:
+
+                  return (
+                      "🔴 MUY FUERTE",
+                      25,
+                      strong_matches,
+                      sentiment
+                  )
+
+              if medium_matches:
+
+                  return (
+                      "🟠 MEDIO",
+                      12,
+                      medium_matches,
+                      sentiment
+                  )
+
+              if sentiment >= 0.30:
+
+                  return (
+                      "🟡 POSITIVO",
+                      7,
+                      [],
+                      sentiment
+                  )
+
+              return (
+                  "⚪ DÉBIL",
+                  0,
+                  [],
+                  sentiment
+              )
+
+          # ==========================================
           # TWELVE DATA
           # ==========================================
 
@@ -161,7 +294,7 @@ jobs:
               url,
               headers={
                   "User-Agent":
-                      "OpportunityScanner/1.0"
+                      "OpportunityScanner/3.0"
               }
           )
 
@@ -177,15 +310,18 @@ jobs:
           except Exception as error:
 
               print("❌ ERROR TWELVE DATA")
-              print(type(error).__name__)
+              print(
+                  type(error).__name__
+              )
               print(str(error))
+
               raise SystemExit(1)
 
           candidates = 0
           errors = 0
 
           # ==========================================
-          # ANALISIS DE ACCIONES
+          # ANALIZAR ACCIONES
           # ==========================================
 
           for symbol in symbols:
@@ -226,9 +362,9 @@ jobs:
                       errors += 1
                       continue
 
-                  # ----------------------------------
+                  # ==================================
                   # PRECIOS
-                  # ----------------------------------
+                  # ==================================
 
                   current_price = float(
                       values[0]["close"]
@@ -258,9 +394,9 @@ jobs:
                       / price_60m
                   ) * 100
 
-                  # ----------------------------------
-                  # ACELERACION
-                  # ----------------------------------
+                  # ==================================
+                  # ACELERACIÓN
+                  # ==================================
 
                   first_half = (
                       (
@@ -283,9 +419,9 @@ jobs:
                       - first_half
                   )
 
-                  # ----------------------------------
-                  # MAXIMO
-                  # ----------------------------------
+                  # ==================================
+                  # MÁXIMO
+                  # ==================================
 
                   highs = []
 
@@ -317,9 +453,9 @@ jobs:
                       / max_price
                   ) * 100
 
-                  # ----------------------------------
+                  # ==================================
                   # VOLUMEN
-                  # ----------------------------------
+                  # ==================================
 
                   volumes = []
 
@@ -365,9 +501,9 @@ jobs:
 
                       volume_ratio = 0
 
-                  # ----------------------------------
-                  # SCORE TECNICO
-                  # ----------------------------------
+                  # ==================================
+                  # SCORE TÉCNICO
+                  # ==================================
 
                   technical_score = 0
 
@@ -405,7 +541,7 @@ jobs:
                   )
 
                   # ==================================
-                  # FILTRO DE CANDIDATA
+                  # FILTRO
                   # ==================================
 
                   if not (
@@ -426,15 +562,50 @@ jobs:
                   )
 
                   # ==================================
-                  # MARKETAUX
+                  # MARKETaux
+                  # SOLO CANDIDATAS
                   # ==================================
 
+                  three_hours_ago = (
+                      datetime.now(
+                          timezone.utc
+                      )
+                      - timedelta(hours=3)
+                  )
+
+                  published_after = (
+                      three_hours_ago
+                      .strftime(
+                          "%Y-%m-%dT%H:%M"
+                      )
+                  )
+
                   news_params = urllib.parse.urlencode({
-                      "api_token": MARKETAUX_KEY,
-                      "symbols": symbol,
-                      "filter_entities": "true",
-                      "language": "en",
-                      "limit": "5"
+
+                      "api_token":
+                          MARKETAUX_KEY,
+
+                      "symbols":
+                          symbol,
+
+                      "filter_entities":
+                          "true",
+
+                      "must_have_entities":
+                          "true",
+
+                      "language":
+                          "en",
+
+                      "limit":
+                          "5",
+
+                      "published_after":
+                          published_after,
+
+                      "sort":
+                          "published_at"
+
                   })
 
                   news_url = (
@@ -448,7 +619,7 @@ jobs:
                           news_url,
                           headers={
                               "User-Agent":
-                                  "OpportunityScanner/1.0"
+                                  "OpportunityScanner/3.0"
                           }
                       )
                   )
@@ -474,37 +645,64 @@ jobs:
                   except Exception as error:
 
                       print(
-                          f"⚠️ Noticias {symbol}: "
+                          f"⚠️ Noticias "
+                          f"{symbol}: "
                           f"{error}"
                       )
 
                   # ==================================
-                  # CATALIZADOR
+                  # ELEGIR MEJOR CATALIZADOR
                   # ==================================
 
-                  catalyst = None
+                  best_article = None
 
-                  if news:
+                  best_bonus = 0
 
-                      # La primera noticia disponible
-                      # se utiliza como posible catalizador.
+                  best_category = (
+                      "⚪ SIN CATALIZADOR"
+                  )
 
-                      latest = news[0]
+                  best_matches = []
 
-                      catalyst = latest.get(
-                          "title",
-                          "Noticia reciente"
+                  best_sentiment = 0
+
+                  for article in news:
+
+                      (
+                          category,
+                          bonus,
+                          matches,
+                          sentiment
+                      ) = classify_news(
+                          article
                       )
+
+                      if bonus > best_bonus:
+
+                          best_article = article
+
+                          best_bonus = bonus
+
+                          best_category = (
+                              category
+                          )
+
+                          best_matches = (
+                              matches
+                          )
+
+                          best_sentiment = (
+                              sentiment
+                          )
 
                   # ==================================
                   # SCORE FINAL
                   # ==================================
 
-                  final_score = technical_score
-
-                  if catalyst:
-
-                      final_score += 10
+                  final_score = (
+                      technical_score
+                      + best_bonus
+                  )
 
                   if final_score > 100:
 
@@ -514,9 +712,13 @@ jobs:
                   # NIVEL
                   # ==================================
 
-                  if final_score >= 85:
+                  if final_score >= 90:
 
-                      level = "🔴 EXTREMO"
+                      level = "🔴 EXCEPCIONAL"
+
+                  elif final_score >= 80:
+
+                      level = "🔴 MUY FUERTE"
 
                   elif final_score >= 70:
 
@@ -531,47 +733,111 @@ jobs:
                       level = "⚪ VIGILAR"
 
                   # ==================================
+                  # INFORMACIÓN DE NOTICIA
+                  # ==================================
+
+                  if best_article:
+
+                      title = best_article.get(
+                          "title",
+                          "Sin título"
+                      )
+
+                      source = best_article.get(
+                          "source",
+                          "Fuente desconocida"
+                      )
+
+                      article_url = (
+                          best_article.get(
+                              "url",
+                              ""
+                          )
+                      )
+
+                  else:
+
+                      title = (
+                          "No se encontró "
+                          "catalizador reciente"
+                      )
+
+                      source = ""
+
+                      article_url = ""
+
+                  # ==================================
                   # TELEGRAM
                   # ==================================
 
                   message = (
                       "🚨 OPORTUNIDAD MOMENTUM\n\n"
-                      f"📈 {symbol}\n\n"
+
+                      f"📈 {symbol}\n"
+
                       f"🎯 SCORE: "
                       f"{final_score}/100\n"
+
                       f"{level}\n\n"
+
                       f"💰 Precio: "
                       f"${current_price:.2f}\n"
+
                       f"📊 30 min: "
                       f"{change_30m:+.2f}%\n"
+
                       f"📊 60 min: "
                       f"{change_60m:+.2f}%\n"
+
                       f"🔥 Volumen: "
                       f"{volume_ratio:.1f}x\n"
+
                       f"⚡ Aceleración: "
                       f"{acceleration:+.2f}\n"
+
                       f"📈 Distancia máximo: "
                       f"{distance_from_high:.2f}%\n\n"
+
+                      f"📰 CATALIZADOR: "
+                      f"{best_category}\n\n"
+
+                      f"{title}\n"
                   )
 
-                  if catalyst:
+                  if source:
 
                       message += (
-                          "📰 CATALIZADOR:\n"
-                          f"{catalyst}\n\n"
+                          f"\nFuente: {source}\n"
                       )
 
-                  else:
+                  if best_matches:
 
                       message += (
-                          "📰 Catalizador: "
-                          "no encontrado\n\n"
+                          "\n🔎 Tipo detectado: "
+                          + ", ".join(
+                              best_matches[:4]
+                          )
+                          + "\n"
+                      )
+
+                  if best_sentiment != 0:
+
+                      message += (
+                          f"💭 Sentimiento: "
+                          f"{best_sentiment:+.2f}\n"
+                      )
+
+                  if article_url:
+
+                      message += (
+                          f"\n🔗 {article_url}\n"
                       )
 
                   message += (
-                      "⚠️ Revisar gráfico, "
-                      "noticia y liquidez "
-                      "antes de operar."
+                      "\n⚠️ Esto es un radar de "
+                      "oportunidades, no una "
+                      "recomendación automática "
+                      "de compra."
                   )
 
                   try:
@@ -608,17 +874,21 @@ jobs:
           # ==========================================
 
           print("=" * 60)
+
           print(
               f"🎯 Candidatas: "
               f"{candidates}"
           )
+
           print(
               f"⚠️ Errores: "
               f"{errors}"
           )
+
           print(
               "✅ ESCANEO TERMINADO"
           )
+
           print("=" * 60)
 
           PY
