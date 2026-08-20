@@ -254,5 +254,69 @@
     "timing": "NORMAL",
     "updated": "2026-08-20T15:03:22.737580+00:00",
     "last_alert": ""
+  },
+  "XOM": {
+    "score": 15,
+    "volume_ratio": 0.025698448692278428,
+    "change30": -0.06562071228299542,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
+  },
+  "CVX": {
+    "score": 15,
+    "volume_ratio": 0.02442637171300892,
+    "change30": -0.12275254531014218,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
+  },
+  "OXY": {
+    "score": 15,
+    "volume_ratio": 0.12169341165590589,
+    "change30": -0.3156872268091311,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
+  },
+  "SLB": {
+    "score": 10,
+    "volume_ratio": 0.06215273400837455,
+    "change30": 0.19580419580419,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
+  },
+  "COP": {
+    "score": 15,
+    "volume_ratio": 0.032910790251027854,
+    "change30": -0.20725388601036354,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
+  },
+  "FANG": {
+    "score": 10,
+    "volume_ratio": 0.004254952382718784,
+    "change30": -0.7622165068973559,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
+  },
+  "MPC": {
+    "score": 15,
+    "volume_ratio": 0.018909416889611026,
+    "change30": -0.3190163889535497,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
+  },
+  "VLO": {
+    "score": 10,
+    "volume_ratio": 0.0007140493325698498,
+    "change30": -0.2304744893549628,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T17:01:13.057942+00:00",
+    "last_alert": ""
   }
 }
