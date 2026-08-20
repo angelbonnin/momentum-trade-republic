@@ -1,23 +1,16 @@
-name: Opportunity Scanner
+name: Market Movers Test
 
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "*/15 13-19 * * 1-5"
-
 jobs:
-  scanner:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Escanear oportunidades
+      - name: Probar Market Movers
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
-          MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RUN_NUMBER: ${{ github.run_number }}
 
         run: |
           python - <<'PY'
@@ -25,268 +18,16 @@ jobs:
           import urllib.parse
           import urllib.request
           import json
-          from datetime import datetime, timezone, timedelta
 
-          TWELVE_KEY = os.environ["TWELVE_DATA_API_KEY"]
-          MARKETAUX_KEY = os.environ["MARKETAUX_API_KEY"]
-          BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-          CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-
-          run_number = int(
-              os.environ.get("RUN_NUMBER", "1")
-          )
-
-          # ==========================================
-          # ACCIONES
-          # ==========================================
-
-          GROUPS = [
-              [
-                  "NVDA", "AMD", "TSLA", "PLTR",
-                  "COIN", "HOOD", "MSTR", "SMCI"
-              ],
-              [
-                  "APP", "ARM", "AVGO", "MU",
-                  "MRVL", "TSM", "QCOM", "INTC"
-              ],
-              [
-                  "AMZN", "META", "NFLX", "GOOG",
-                  "GOOGL", "AAPL", "MSFT", "AMAT"
-              ],
-              [
-                  "LRCX", "CRWD", "PANW", "SNOW",
-                  "DDOG", "NET", "RBLX", "SHOP"
-              ],
-              [
-                  "UBER", "ABNB", "MELI", "CVNA",
-                  "RIVN", "NIO", "SOFI", "MARA"
-              ]
-          ]
-
-          group_index = (
-              (run_number - 1)
-              % len(GROUPS)
-          )
-
-          symbols = GROUPS[group_index]
-
-          print("=" * 60)
-          print("🚨 OPPORTUNITY SCANNER V3")
-          print("=" * 60)
-          print(
-              f"Grupo: {group_index + 1}/"
-              f"{len(GROUPS)}"
-          )
-          print(
-              "Acciones: "
-              + ", ".join(symbols)
-          )
-          print("=" * 60)
-
-          # ==========================================
-          # TELEGRAM
-          # ==========================================
-
-          def send_telegram(message):
-
-              url = (
-                  "https://api.telegram.org/"
-                  f"bot{BOT_TOKEN}/sendMessage"
-              )
-
-              data = urllib.parse.urlencode({
-                  "chat_id": CHAT_ID,
-                  "text": message
-              }).encode()
-
-              request = urllib.request.Request(
-                  url,
-                  data=data
-              )
-
-              with urllib.request.urlopen(
-                  request,
-                  timeout=20
-              ) as response:
-
-                  return response.read().decode()
-
-          # ==========================================
-          # CLASIFICADOR DE CATALIZADORES
-          # ==========================================
-
-          STRONG_KEYWORDS = [
-              "fda",
-              "approval",
-              "approved",
-              "clinical trial",
-              "clinical study",
-              "phase 1",
-              "phase 2",
-              "phase 3",
-              "trial results",
-              "positive results",
-              "earnings",
-              "quarterly results",
-              "revenue",
-              "guidance",
-              "acquisition",
-              "acquire",
-              "merger",
-              "contract",
-              "major contract",
-              "partnership",
-              "agreement",
-              "deal",
-              "regulatory",
-              "drug approval",
-              "drug candidate",
-              "buyback",
-              "share repurchase",
-              "product launch"
-          ]
-
-          MEDIUM_KEYWORDS = [
-              "upgrade",
-              "downgrade",
-              "price target",
-              "analyst",
-              "expansion",
-              "collaboration",
-              "investment",
-              "forecast",
-              "outlook",
-              "presentation"
-          ]
-
-          def classify_news(article):
-
-              title = (
-                  article.get("title", "")
-                  or ""
-              ).lower()
-
-              description = (
-                  article.get("description", "")
-                  or ""
-              ).lower()
-
-              snippet = (
-                  article.get("snippet", "")
-                  or ""
-              ).lower()
-
-              text = (
-                  title
-                  + " "
-                  + description
-                  + " "
-                  + snippet
-              )
-
-              strong_matches = []
-
-              medium_matches = []
-
-              for keyword in STRONG_KEYWORDS:
-
-                  if keyword in text:
-
-                      strong_matches.append(
-                          keyword
-                      )
-
-              for keyword in MEDIUM_KEYWORDS:
-
-                  if keyword in text:
-
-                      medium_matches.append(
-                          keyword
-                      )
-
-              sentiment = 0
-
-              entities = article.get(
-                  "entities",
-                  []
-              )
-
-              for entity in entities:
-
-                  symbol = entity.get(
-                      "symbol",
-                      ""
-                  )
-
-                  if symbol:
-
-                      sentiment_value = (
-                          entity.get(
-                              "sentiment_score"
-                          )
-                      )
-
-                      if sentiment_value is not None:
-
-                          try:
-
-                              sentiment = float(
-                                  sentiment_value
-                              )
-
-                              break
-
-                          except:
-
-                              pass
-
-              if strong_matches:
-
-                  return (
-                      "🔴 MUY FUERTE",
-                      25,
-                      strong_matches,
-                      sentiment
-                  )
-
-              if medium_matches:
-
-                  return (
-                      "🟠 MEDIO",
-                      12,
-                      medium_matches,
-                      sentiment
-                  )
-
-              if sentiment >= 0.30:
-
-                  return (
-                      "🟡 POSITIVO",
-                      7,
-                      [],
-                      sentiment
-                  )
-
-              return (
-                  "⚪ DÉBIL",
-                  0,
-                  [],
-                  sentiment
-              )
-
-          # ==========================================
-          # TWELVE DATA
-          # ==========================================
+          API_KEY = os.environ["TWELVE_DATA_API_KEY"]
 
           params = urllib.parse.urlencode({
-              "symbol": ",".join(symbols),
-              "interval": "1min",
-              "outputsize": "61",
-              "apikey": TWELVE_KEY
+              "apikey": API_KEY
           })
 
           url = (
-              "https://api.twelvedata.com/time_series?"
+              "https://api.twelvedata.com/"
+              "market_movers/stocks?"
               + params
           )
 
@@ -294,7 +35,7 @@ jobs:
               url,
               headers={
                   "User-Agent":
-                      "OpportunityScanner/3.0"
+                      "OpportunityScanner/4.0"
               }
           )
 
@@ -307,588 +48,78 @@ jobs:
 
                   data = json.load(response)
 
+              print("=" * 60)
+              print("🚀 TWELVE DATA MARKET MOVERS")
+              print("=" * 60)
+
+              if "values" not in data:
+
+                  print("❌ No se recibió 'values'")
+                  print(data)
+
+                  raise SystemExit(1)
+
+              movers = data["values"]
+
+              print(
+                  f"Movimientos recibidos: "
+                  f"{len(movers)}"
+              )
+
+              print()
+
+              for stock in movers[:20]:
+
+                  symbol = stock.get(
+                      "symbol",
+                      "?"
+                  )
+
+                  name = stock.get(
+                      "name",
+                      "?"
+                  )
+
+                  percent = stock.get(
+                      "percent_change",
+                      0
+                  )
+
+                  volume = stock.get(
+                      "volume",
+                      0
+                  )
+
+                  price = stock.get(
+                      "last",
+                      0
+                  )
+
+                  print(
+                      f"{symbol:8} | "
+                      f"{str(percent):>8}% | "
+                      f"${str(price):>10} | "
+                      f"Vol: {volume} | "
+                      f"{name}"
+                  )
+
+              print()
+              print("=" * 60)
+              print("✅ MARKET MOVERS FUNCIONA")
+              print("=" * 60)
+
           except Exception as error:
 
-              print("❌ ERROR TWELVE DATA")
+              print("=" * 60)
+              print("❌ ERROR MARKET MOVERS")
+              print("=" * 60)
+
               print(
                   type(error).__name__
               )
+
               print(str(error))
 
               raise SystemExit(1)
-
-          candidates = 0
-          errors = 0
-
-          # ==========================================
-          # ANALIZAR ACCIONES
-          # ==========================================
-
-          for symbol in symbols:
-
-              try:
-
-                  if symbol not in data:
-
-                      print(
-                          f"❌ {symbol}: "
-                          "sin datos"
-                      )
-
-                      errors += 1
-                      continue
-
-                  symbol_data = data[symbol]
-
-                  if "values" not in symbol_data:
-
-                      print(
-                          f"❌ {symbol}: "
-                          "sin velas"
-                      )
-
-                      errors += 1
-                      continue
-
-                  values = symbol_data["values"]
-
-                  if len(values) < 61:
-
-                      print(
-                          f"❌ {symbol}: "
-                          "datos insuficientes"
-                      )
-
-                      errors += 1
-                      continue
-
-                  # ==================================
-                  # PRECIOS
-                  # ==================================
-
-                  current_price = float(
-                      values[0]["close"]
-                  )
-
-                  price_30m = float(
-                      values[30]["close"]
-                  )
-
-                  price_60m = float(
-                      values[60]["close"]
-                  )
-
-                  change_30m = (
-                      (
-                          current_price
-                          - price_30m
-                      )
-                      / price_30m
-                  ) * 100
-
-                  change_60m = (
-                      (
-                          current_price
-                          - price_60m
-                      )
-                      / price_60m
-                  ) * 100
-
-                  # ==================================
-                  # ACELERACIÓN
-                  # ==================================
-
-                  first_half = (
-                      (
-                          price_30m
-                          - price_60m
-                      )
-                      / price_60m
-                  ) * 100
-
-                  second_half = (
-                      (
-                          current_price
-                          - price_30m
-                      )
-                      / price_30m
-                  ) * 100
-
-                  acceleration = (
-                      second_half
-                      - first_half
-                  )
-
-                  # ==================================
-                  # MÁXIMO
-                  # ==================================
-
-                  highs = []
-
-                  for candle in values:
-
-                      try:
-
-                          highs.append(
-                              float(
-                                  candle["high"]
-                              )
-                          )
-
-                      except:
-
-                          pass
-
-                  max_price = (
-                      max(highs)
-                      if highs
-                      else current_price
-                  )
-
-                  distance_from_high = (
-                      (
-                          max_price
-                          - current_price
-                      )
-                      / max_price
-                  ) * 100
-
-                  # ==================================
-                  # VOLUMEN
-                  # ==================================
-
-                  volumes = []
-
-                  for candle in values:
-
-                      if "volume" in candle:
-
-                          try:
-
-                              volumes.append(
-                                  float(
-                                      candle["volume"]
-                                  )
-                              )
-
-                          except:
-
-                              pass
-
-                  if len(volumes) >= 2:
-
-                      current_volume = volumes[0]
-
-                      historical = volumes[1:]
-
-                      average_volume = (
-                          sum(historical)
-                          / len(historical)
-                      )
-
-                      if average_volume > 0:
-
-                          volume_ratio = (
-                              current_volume
-                              / average_volume
-                          )
-
-                      else:
-
-                          volume_ratio = 0
-
-                  else:
-
-                      volume_ratio = 0
-
-                  # ==================================
-                  # SCORE TÉCNICO
-                  # ==================================
-
-                  technical_score = 0
-
-                  if change_30m >= 3:
-                      technical_score += 20
-
-                  if change_30m >= 5:
-                      technical_score += 10
-
-                  if volume_ratio >= 4:
-                      technical_score += 20
-
-                  if volume_ratio >= 8:
-                      technical_score += 10
-
-                  if acceleration > 0:
-                      technical_score += 10
-
-                  if acceleration >= 2:
-                      technical_score += 10
-
-                  if distance_from_high <= 1:
-                      technical_score += 10
-
-                  print(
-                      f"{symbol} | "
-                      f"30m "
-                      f"{change_30m:+.2f}% | "
-                      f"60m "
-                      f"{change_60m:+.2f}% | "
-                      f"Vol "
-                      f"{volume_ratio:.1f}x | "
-                      f"Score "
-                      f"{technical_score}/90"
-                  )
-
-                  # ==================================
-                  # FILTRO
-                  # ==================================
-
-                  if not (
-                      change_30m >= 3
-                      and
-                      volume_ratio >= 4
-                      and
-                      technical_score >= 50
-                  ):
-
-                      continue
-
-                  candidates += 1
-
-                  print(
-                      f"🔎 CANDIDATA: "
-                      f"{symbol}"
-                  )
-
-                  # ==================================
-                  # MARKETaux
-                  # SOLO CANDIDATAS
-                  # ==================================
-
-                  three_hours_ago = (
-                      datetime.now(
-                          timezone.utc
-                      )
-                      - timedelta(hours=3)
-                  )
-
-                  published_after = (
-                      three_hours_ago
-                      .strftime(
-                          "%Y-%m-%dT%H:%M"
-                      )
-                  )
-
-                  news_params = urllib.parse.urlencode({
-
-                      "api_token":
-                          MARKETAUX_KEY,
-
-                      "symbols":
-                          symbol,
-
-                      "filter_entities":
-                          "true",
-
-                      "must_have_entities":
-                          "true",
-
-                      "language":
-                          "en",
-
-                      "limit":
-                          "5",
-
-                      "published_after":
-                          published_after,
-
-                      "sort":
-                          "published_at"
-
-                  })
-
-                  news_url = (
-                      "https://api.marketaux.com/"
-                      "v1/news/all?"
-                      + news_params
-                  )
-
-                  news_request = (
-                      urllib.request.Request(
-                          news_url,
-                          headers={
-                              "User-Agent":
-                                  "OpportunityScanner/3.0"
-                          }
-                      )
-                  )
-
-                  news = []
-
-                  try:
-
-                      with urllib.request.urlopen(
-                          news_request,
-                          timeout=30
-                      ) as response:
-
-                          news_data = json.load(
-                              response
-                          )
-
-                      news = news_data.get(
-                          "data",
-                          []
-                      )
-
-                  except Exception as error:
-
-                      print(
-                          f"⚠️ Noticias "
-                          f"{symbol}: "
-                          f"{error}"
-                      )
-
-                  # ==================================
-                  # ELEGIR MEJOR CATALIZADOR
-                  # ==================================
-
-                  best_article = None
-
-                  best_bonus = 0
-
-                  best_category = (
-                      "⚪ SIN CATALIZADOR"
-                  )
-
-                  best_matches = []
-
-                  best_sentiment = 0
-
-                  for article in news:
-
-                      (
-                          category,
-                          bonus,
-                          matches,
-                          sentiment
-                      ) = classify_news(
-                          article
-                      )
-
-                      if bonus > best_bonus:
-
-                          best_article = article
-
-                          best_bonus = bonus
-
-                          best_category = (
-                              category
-                          )
-
-                          best_matches = (
-                              matches
-                          )
-
-                          best_sentiment = (
-                              sentiment
-                          )
-
-                  # ==================================
-                  # SCORE FINAL
-                  # ==================================
-
-                  final_score = (
-                      technical_score
-                      + best_bonus
-                  )
-
-                  if final_score > 100:
-
-                      final_score = 100
-
-                  # ==================================
-                  # NIVEL
-                  # ==================================
-
-                  if final_score >= 90:
-
-                      level = "🔴 EXCEPCIONAL"
-
-                  elif final_score >= 80:
-
-                      level = "🔴 MUY FUERTE"
-
-                  elif final_score >= 70:
-
-                      level = "🟠 FUERTE"
-
-                  elif final_score >= 50:
-
-                      level = "🟡 INTERESANTE"
-
-                  else:
-
-                      level = "⚪ VIGILAR"
-
-                  # ==================================
-                  # INFORMACIÓN DE NOTICIA
-                  # ==================================
-
-                  if best_article:
-
-                      title = best_article.get(
-                          "title",
-                          "Sin título"
-                      )
-
-                      source = best_article.get(
-                          "source",
-                          "Fuente desconocida"
-                      )
-
-                      article_url = (
-                          best_article.get(
-                              "url",
-                              ""
-                          )
-                      )
-
-                  else:
-
-                      title = (
-                          "No se encontró "
-                          "catalizador reciente"
-                      )
-
-                      source = ""
-
-                      article_url = ""
-
-                  # ==================================
-                  # TELEGRAM
-                  # ==================================
-
-                  message = (
-                      "🚨 OPORTUNIDAD MOMENTUM\n\n"
-
-                      f"📈 {symbol}\n"
-
-                      f"🎯 SCORE: "
-                      f"{final_score}/100\n"
-
-                      f"{level}\n\n"
-
-                      f"💰 Precio: "
-                      f"${current_price:.2f}\n"
-
-                      f"📊 30 min: "
-                      f"{change_30m:+.2f}%\n"
-
-                      f"📊 60 min: "
-                      f"{change_60m:+.2f}%\n"
-
-                      f"🔥 Volumen: "
-                      f"{volume_ratio:.1f}x\n"
-
-                      f"⚡ Aceleración: "
-                      f"{acceleration:+.2f}\n"
-
-                      f"📈 Distancia máximo: "
-                      f"{distance_from_high:.2f}%\n\n"
-
-                      f"📰 CATALIZADOR: "
-                      f"{best_category}\n\n"
-
-                      f"{title}\n"
-                  )
-
-                  if source:
-
-                      message += (
-                          f"\nFuente: {source}\n"
-                      )
-
-                  if best_matches:
-
-                      message += (
-                          "\n🔎 Tipo detectado: "
-                          + ", ".join(
-                              best_matches[:4]
-                          )
-                          + "\n"
-                      )
-
-                  if best_sentiment != 0:
-
-                      message += (
-                          f"💭 Sentimiento: "
-                          f"{best_sentiment:+.2f}\n"
-                      )
-
-                  if article_url:
-
-                      message += (
-                          f"\n🔗 {article_url}\n"
-                      )
-
-                  message += (
-                      "\n⚠️ Esto es un radar de "
-                      "oportunidades, no una "
-                      "recomendación automática "
-                      "de compra."
-                  )
-
-                  try:
-
-                      send_telegram(
-                          message
-                      )
-
-                      print(
-                          f"📱 ALERTA: "
-                          f"{symbol}"
-                      )
-
-                  except Exception as error:
-
-                      print(
-                          f"❌ Telegram "
-                          f"{symbol}: "
-                          f"{error}"
-                      )
-
-              except Exception as error:
-
-                  print(
-                      f"⚠️ {symbol}: "
-                      f"{type(error).__name__}: "
-                      f"{error}"
-                  )
-
-                  errors += 1
-
-          # ==========================================
-          # RESUMEN
-          # ==========================================
-
-          print("=" * 60)
-
-          print(
-              f"🎯 Candidatas: "
-              f"{candidates}"
-          )
-
-          print(
-              f"⚠️ Errores: "
-              f"{errors}"
-          )
-
-          print(
-              "✅ ESCANEO TERMINADO"
-          )
-
-          print("=" * 60)
 
           PY
