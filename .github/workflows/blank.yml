@@ -1,4 +1,4 @@
-name: Momentum Detector
+name: Opportunity Scanner
 
 on:
   workflow_dispatch:
@@ -7,11 +7,11 @@ on:
     - cron: "*/15 13-19 * * 1-5"
 
 jobs:
-  momentum:
+  scanner:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Detectar momentum
+      - name: Escanear oportunidades
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -33,7 +33,12 @@ jobs:
               os.environ.get("RUN_NUMBER", "1")
           )
 
+          # ==========================================
+          # UNIVERSO DE ACCIONES
+          # ==========================================
+
           GROUPS = [
+
               [
                   "NVDA",
                   "AMD",
@@ -44,6 +49,7 @@ jobs:
                   "MSTR",
                   "SMCI"
               ],
+
               [
                   "APP",
                   "ARM",
@@ -54,6 +60,7 @@ jobs:
                   "QCOM",
                   "INTC"
               ],
+
               [
                   "AMZN",
                   "META",
@@ -64,6 +71,7 @@ jobs:
                   "MSFT",
                   "AMAT"
               ],
+
               [
                   "LRCX",
                   "CRWD",
@@ -74,6 +82,7 @@ jobs:
                   "RBLX",
                   "SHOP"
               ],
+
               [
                   "UBER",
                   "ABNB",
@@ -84,6 +93,7 @@ jobs:
                   "SOFI",
                   "MARA"
               ]
+
           ]
 
           group_index = (
@@ -94,18 +104,25 @@ jobs:
           symbols = GROUPS[group_index]
 
           print("=" * 60)
-          print("🚨 MOMENTUM DETECTOR")
+          print("🚨 OPPORTUNITY SCANNER")
           print("=" * 60)
-          print(f"Ejecución: {run_number}")
+
           print(
-              f"Grupo: {group_index + 1}/"
+              f"Grupo: "
+              f"{group_index + 1}/"
               f"{len(GROUPS)}"
           )
+
           print(
               "Acciones: "
               + ", ".join(symbols)
           )
+
           print("=" * 60)
+
+          # ==========================================
+          # TELEGRAM
+          # ==========================================
 
           def send_telegram(message):
 
@@ -115,31 +132,49 @@ jobs:
               )
 
               data = urllib.parse.urlencode({
+
                   "chat_id": CHAT_ID,
+
                   "text": message
+
               }).encode()
 
               request = urllib.request.Request(
+
                   url,
+
                   data=data
+
               )
 
               with urllib.request.urlopen(
+
                   request,
+
                   timeout=20
+
               ) as response:
 
                   return response.read().decode()
 
-          # ----------------------------------------
-          # CONSULTAR TWELVE DATA
-          # ----------------------------------------
+          # ==========================================
+          # TWELVE DATA
+          # ==========================================
 
           params = urllib.parse.urlencode({
-              "symbol": ",".join(symbols),
-              "interval": "1min",
-              "outputsize": "61",
-              "apikey": API_KEY
+
+              "symbol":
+                  ",".join(symbols),
+
+              "interval":
+                  "1min",
+
+              "outputsize":
+                  "61",
+
+              "apikey":
+                  API_KEY
+
           })
 
           url = (
@@ -148,35 +183,54 @@ jobs:
           )
 
           request = urllib.request.Request(
+
               url,
+
               headers={
-                  "User-Agent": "MomentumDetector/1.0"
+                  "User-Agent":
+                      "OpportunityScanner/1.0"
               }
+
           )
 
           try:
 
               with urllib.request.urlopen(
+
                   request,
+
                   timeout=30
+
               ) as response:
 
                   data = json.load(response)
 
           except Exception as error:
 
-              print("❌ ERROR CONSULTANDO TWELVE DATA")
-              print(type(error).__name__)
-              print(str(error))
+              print(
+                  "❌ ERROR TWELVE DATA"
+              )
+
+              print(
+                  type(error).__name__
+              )
+
+              print(
+                  str(error)
+              )
 
               raise SystemExit(1)
 
-          alerts = 0
+          # ==========================================
+          # CONTADORES
+          # ==========================================
+
+          candidates = 0
           errors = 0
 
-          # ----------------------------------------
-          # ANALIZAR CADA ACCIÓN
-          # ----------------------------------------
+          # ==========================================
+          # ANALISIS
+          # ==========================================
 
           for symbol in symbols:
 
@@ -186,10 +240,11 @@ jobs:
 
                       print(
                           f"❌ {symbol}: "
-                          "no recibido"
+                          "sin datos"
                       )
 
                       errors += 1
+
                       continue
 
                   symbol_data = data[symbol]
@@ -198,10 +253,11 @@ jobs:
 
                       print(
                           f"❌ {symbol}: "
-                          "sin datos"
+                          "sin velas"
                       )
 
                       errors += 1
+
                       continue
 
                   values = symbol_data["values"]
@@ -210,35 +266,127 @@ jobs:
 
                       print(
                           f"❌ {symbol}: "
-                          f"solo {len(values)} velas"
+                          "datos insuficientes"
                       )
 
                       errors += 1
+
                       continue
 
-                  # --------------------------------
-                  # PRECIO
-                  # --------------------------------
+                  # =================================
+                  # PRECIOS
+                  # =================================
 
                   current_price = float(
                       values[0]["close"]
                   )
 
-                  old_price = float(
+                  price_30m = float(
+                      values[30]["close"]
+                  )
+
+                  price_60m = float(
                       values[60]["close"]
                   )
 
-                  change = (
+                  # =================================
+                  # MOVIMIENTO 30 MIN
+                  # =================================
+
+                  change_30m = (
+
                       (
                           current_price
-                          - old_price
+                          - price_30m
                       )
-                      / old_price
+                      / price_30m
+
                   ) * 100
 
-                  # --------------------------------
+                  # =================================
+                  # MOVIMIENTO 60 MIN
+                  # =================================
+
+                  change_60m = (
+
+                      (
+                          current_price
+                          - price_60m
+                      )
+                      / price_60m
+
+                  ) * 100
+
+                  # =================================
+                  # ACELERACION
+                  # =================================
+
+                  first_half = (
+
+                      (
+                          price_30m
+                          - price_60m
+                      )
+                      / price_60m
+
+                  ) * 100
+
+                  second_half = (
+
+                      (
+                          current_price
+                          - price_30m
+                      )
+                      / price_30m
+
+                  ) * 100
+
+                  acceleration = (
+                      second_half
+                      - first_half
+                  )
+
+                  # =================================
+                  # MAXIMO 60 MIN
+                  # =================================
+
+                  highs = []
+
+                  for candle in values:
+
+                      try:
+
+                          highs.append(
+                              float(
+                                  candle["high"]
+                              )
+                          )
+
+                      except:
+
+                          pass
+
+                  if highs:
+
+                      max_price = max(highs)
+
+                  else:
+
+                      max_price = current_price
+
+                  distance_from_high = (
+
+                      (
+                          max_price
+                          - current_price
+                      )
+                      / max_price
+
+                  ) * 100
+
+                  # =================================
                   # VOLUMEN
-                  # --------------------------------
+                  # =================================
 
                   volumes = []
 
@@ -250,7 +398,9 @@ jobs:
 
                               volumes.append(
                                   float(
-                                      candle["volume"]
+                                      candle[
+                                          "volume"
+                                      ]
                                   )
                               )
 
@@ -262,24 +412,30 @@ jobs:
 
                       current_volume = volumes[0]
 
-                      historical_volumes = (
+                      historical_volume = (
                           volumes[1:]
                       )
 
                       average_volume = (
+
                           sum(
-                              historical_volumes
+                              historical_volume
                           )
-                          / len(
-                              historical_volumes
+                          /
+                          len(
+                              historical_volume
                           )
+
                       )
 
                       if average_volume > 0:
 
                           volume_ratio = (
+
                               current_volume
-                              / average_volume
+                              /
+                              average_volume
+
                           )
 
                       else:
@@ -290,43 +446,103 @@ jobs:
 
                       volume_ratio = 0
 
-                  # --------------------------------
-                  # MOSTRAR RESULTADO
-                  # --------------------------------
+                  # =================================
+                  # PUNTUACION
+                  # =================================
+
+                  score = 0
+
+                  # Movimiento
+                  if change_30m >= 3:
+                      score += 25
+
+                  if change_30m >= 5:
+                      score += 10
+
+                  # Volumen
+                  if volume_ratio >= 4:
+                      score += 25
+
+                  if volume_ratio >= 8:
+                      score += 10
+
+                  # Aceleracion
+                  if acceleration > 0:
+                      score += 10
+
+                  if acceleration >= 2:
+                      score += 10
+
+                  # Cerca del maximo
+                  if distance_from_high <= 1:
+                      score += 10
+
+                  # =================================
+                  # MOSTRAR
+                  # =================================
 
                   print(
-                      f"✅ {symbol} | "
-                      f"${current_price:.2f} | "
-                      f"60m: "
-                      f"{change:+.2f}% | "
-                      f"Volumen: "
-                      f"{volume_ratio:.1f}x"
+                      f"{symbol} | "
+                      f"30m "
+                      f"{change_30m:+.2f}% | "
+                      f"60m "
+                      f"{change_60m:+.2f}% | "
+                      f"Vol "
+                      f"{volume_ratio:.1f}x | "
+                      f"Accel "
+                      f"{acceleration:+.2f} | "
+                      f"High "
+                      f"{distance_from_high:.2f}% | "
+                      f"Score "
+                      f"{score}/100"
                   )
 
-                  # --------------------------------
-                  # MOMENTUM
-                  # --------------------------------
+                  # =================================
+                  # CANDIDATA
+                  # =================================
 
-                  momentum = (
-                      change >= 10
-                      and volume_ratio >= 3
-                  )
+                  if (
 
-                  if momentum:
+                      change_30m >= 3
+
+                      and
+
+                      volume_ratio >= 4
+
+                      and
+
+                      score >= 50
+
+                  ):
+
+                      candidates += 1
 
                       message = (
-                          "🚨 MOMENTUM DETECTADO 🚨\n\n"
-                          f"📈 Acción: {symbol}\n"
-                          f"💰 Precio: "
-                          f"${current_price:.2f}\n"
-                          f"📊 Movimiento 60 min: "
-                          f"+{change:.2f}%\n"
+
+                          "🚨 OPORTUNIDAD MOMENTUM\n\n"
+
+                          f"📈 {symbol}\n\n"
+
+                          f"🎯 SCORE: "
+                          f"{score}/100\n\n"
+
+                          f"📊 30 min: "
+                          f"{change_30m:+.2f}%\n"
+
+                          f"📊 60 min: "
+                          f"{change_60m:+.2f}%\n"
+
                           f"🔥 Volumen: "
-                          f"{volume_ratio:.1f}x "
-                          "la media\n\n"
-                          "⚠️ Señal de momentum. "
-                          "No es una recomendación "
-                          "automática de compra."
+                          f"{volume_ratio:.1f}x\n"
+
+                          f"⚡ Aceleración: "
+                          f"{acceleration:+.2f}\n"
+
+                          f"📈 Distancia máximo: "
+                          f"{distance_from_high:.2f}%\n\n"
+
+                          "⚠️ Revisar gráfico y "
+                          "catalizador antes de operar."
                       )
 
                       try:
@@ -336,16 +552,14 @@ jobs:
                           )
 
                           print(
-                              f"📱 ALERTA TELEGRAM: "
+                              f"📱 ALERTA: "
                               f"{symbol}"
                           )
-
-                          alerts += 1
 
                       except Exception as error:
 
                           print(
-                              "❌ ERROR TELEGRAM:"
+                              "❌ ERROR TELEGRAM"
                           )
 
                           print(error)
@@ -354,32 +568,25 @@ jobs:
 
                   print(
                       f"⚠️ {symbol}: "
-                      f"{type(error).__name__}: "
                       f"{error}"
                   )
 
                   errors += 1
 
-          # ----------------------------------------
+          # ==========================================
           # RESUMEN
-          # ----------------------------------------
+          # ==========================================
 
           print("=" * 60)
 
           print(
-              f"🚨 Alertas enviadas: "
-              f"{alerts}"
+              f"🎯 Candidatas: "
+              f"{candidates}"
           )
 
           print(
-              f"⚠️ Acciones con errores: "
+              f"⚠️ Errores: "
               f"{errors}"
-          )
-
-          print(
-              f"🔎 Grupo analizado: "
-              f"{group_index + 1}/"
-              f"{len(GROUPS)}"
           )
 
           print(
