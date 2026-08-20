@@ -23,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Opportunity Scanner V8
+      - name: Ejecutar Opportunity Scanner V8
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
@@ -33,109 +33,118 @@ jobs:
 
         run: |
           python - <<'PY'
+
           import os
+          import json
           import urllib.parse
           import urllib.request
-          import json
           import subprocess
           from datetime import datetime, timezone, timedelta
+
+
+          # ============================================================
+          # CONFIGURACIÓN
+          # ============================================================
 
           TD = os.environ["TWELVE_DATA_API_KEY"]
           MX = os.environ["MARKETAUX_API_KEY"]
           BOT = os.environ["TELEGRAM_BOT_TOKEN"]
           CHAT = os.environ["TELEGRAM_CHAT_ID"]
 
-          run = int(
+          RUN_NUMBER = int(
               os.environ.get("RUN_NUMBER", "1")
           )
-
-          # ==================================================
-          # CONFIGURACIÓN
-          # ==================================================
 
           STATE_FILE = "scanner_state.json"
           SIGNAL_FILE = "signal_log.json"
 
-          # ==================================================
-          # UNIVERSO
-          # ==================================================
+
+          # ============================================================
+          # UNIVERSO DE ACCIONES
+          # ============================================================
 
           groups = [
 
               [
-                  "NVDA","AMD","AVGO","MU",
-                  "MRVL","ARM","SMCI","INTC"
+                  "NVDA", "AMD", "AVGO", "MU",
+                  "MRVL", "ARM", "SMCI", "INTC"
               ],
 
               [
-                  "TSLA","PLTR","APP","HOOD",
-                  "COIN","MSTR","MARA","RIVN"
+                  "TSLA", "PLTR", "APP", "HOOD",
+                  "COIN", "MSTR", "MARA", "RIVN"
               ],
 
               [
-                  "META","AMZN","NFLX","GOOG",
-                  "GOOGL","AAPL","MSFT","ORCL"
+                  "META", "AMZN", "NFLX", "GOOG",
+                  "GOOGL", "AAPL", "MSFT", "ORCL"
               ],
 
               [
-                  "CRWD","PANW","SNOW","DDOG",
-                  "NET","RBLX","SHOP","U"
+                  "CRWD", "PANW", "SNOW", "DDOG",
+                  "NET", "RBLX", "SHOP", "U"
               ],
 
               [
-                  "UBER","ABNB","CVNA","SOFI",
-                  "NIO","LI","XPEV","BABA"
+                  "UBER", "ABNB", "CVNA", "SOFI",
+                  "NIO", "LI", "XPEV", "BABA"
               ],
 
               [
-                  "JPM","BAC","GS","MS",
-                  "C","WFC","V","MA"
+                  "JPM", "BAC", "GS", "MS",
+                  "C", "WFC", "V", "MA"
               ],
 
               [
-                  "MRNA","PFE","LLY","BNTX",
-                  "REGN","VRTX","GILD","BIIB"
+                  "MRNA", "PFE", "LLY", "BNTX",
+                  "REGN", "VRTX", "GILD", "BIIB"
               ],
 
               [
-                  "XOM","CVX","OXY","SLB",
-                  "COP","FANG","MPC","VLO"
+                  "XOM", "CVX", "OXY", "SLB",
+                  "COP", "FANG", "MPC", "VLO"
               ],
 
               [
-                  "BA","GE","CAT","DE",
-                  "LMT","RTX","NOC","GD"
+                  "BA", "GE", "CAT", "DE",
+                  "LMT", "RTX", "NOC", "GD"
               ],
 
               [
-                  "T","VZ","TMUS","CMCSA",
-                  "DIS","WBD","TGT","COST"
+                  "T", "VZ", "TMUS", "CMCSA",
+                  "DIS", "WBD", "TGT", "COST"
               ]
 
           ]
 
           group_index = (
-              (run - 1) % len(groups)
+              (RUN_NUMBER - 1)
+              % len(groups)
           )
 
           symbols = groups[group_index]
 
-          now = datetime.now(
-              timezone.utc
-          )
+          now = datetime.now(timezone.utc)
+
 
           print("=" * 70)
-          print("🚨 OPPORTUNITY SCANNER V8")
+          print("OPPORTUNITY SCANNER V8")
           print("=" * 70)
-
           print(
-              f"Grupo {group_index + 1}/"
-              f"{len(groups)}"
+              "Grupo:",
+              group_index + 1,
+              "/",
+              len(groups)
+          )
+          print(
+              "Acciones:",
+              ", ".join(symbols)
           )
 
-          # ==================================================
+
+          # ============================================================
           # CARGAR MEMORIA
-          # ==================================================
+          # ============================================================
 
           try:
 
@@ -147,17 +156,19 @@ jobs:
 
                   state = json.load(f)
 
-          except:
+          except Exception:
 
               state = {}
+
 
           if not isinstance(state, dict):
 
               state = {}
 
-          # ==================================================
-          # CARGAR REGISTRO DE SEÑALES
-          # ==================================================
+
+          # ============================================================
+          # CARGAR HISTORIAL DE SEÑALES
+          # ============================================================
 
           try:
 
@@ -169,23 +180,27 @@ jobs:
 
                   signals = json.load(f)
 
-          except:
+          except Exception:
 
               signals = []
+
 
           if not isinstance(signals, list):
 
               signals = []
 
-          # ==================================================
+
+          # ============================================================
           # TELEGRAM
-          # ==================================================
+          # ============================================================
 
           def telegram(message):
 
               url = (
                   "https://api.telegram.org/"
-                  f"bot{BOT}/sendMessage"
+                  "bot"
+                  + BOT
+                  + "/sendMessage"
               )
 
               data = urllib.parse.urlencode({
@@ -205,25 +220,27 @@ jobs:
 
                   return response.read()
 
-          # ==================================================
-          # TWELVE DATA
-          # ==================================================
 
-          def get_market_data(
-              requested_symbols
-          ):
+          # ============================================================
+          # TWELVE DATA
+          # ============================================================
+
+          def get_market_data():
 
               params = urllib.parse.urlencode({
+
                   "symbol":
-                      ",".join(
-                          requested_symbols
-                      ),
+                      ",".join(symbols),
+
                   "interval":
                       "1min",
+
                   "outputsize":
                       "391",
+
                   "apikey":
                       TD
+
               })
 
               url = (
@@ -247,27 +264,25 @@ jobs:
 
                   return json.load(response)
 
+
           try:
 
-              market = get_market_data(
-                  symbols
-              )
+              market = get_market_data()
 
-          except Exception as e:
+          except Exception as error:
 
-              print(
-                  "❌ ERROR TWELVE DATA"
-              )
-
-              print(e)
+              print("ERROR TWELVE DATA:")
+              print(error)
 
               raise SystemExit(1)
 
-          # ==================================================
-          # CATALIZADORES
-          # ==================================================
 
-          strong = [
+          # ============================================================
+          # PALABRAS DE CATALIZADOR
+          # ============================================================
+
+          strong_keywords = [
+
               "fda",
               "approval",
               "approved",
@@ -292,9 +307,12 @@ jobs:
               "buyback",
               "share repurchase",
               "product launch"
+
           ]
 
-          medium = [
+
+          medium_keywords = [
+
               "upgrade",
               "downgrade",
               "price target",
@@ -304,68 +322,93 @@ jobs:
               "investment",
               "forecast",
               "outlook"
+
           ]
 
-          def classify(article):
+
+          def classify_news(article):
 
               text = " ".join([
+
                   str(
                       article.get(
                           "title",
                           ""
                       )
                   ),
+
                   str(
                       article.get(
                           "description",
                           ""
                       )
                   ),
+
                   str(
                       article.get(
                           "snippet",
                           ""
                       )
                   )
+
               ]).lower()
 
+
               strong_hits = [
-                  x for x in strong
-                  if x in text
+
+                  keyword
+
+                  for keyword
+                  in strong_keywords
+
+                  if keyword in text
+
               ]
 
+
               medium_hits = [
-                  x for x in medium
-                  if x in text
+
+                  keyword
+
+                  for keyword
+                  in medium_keywords
+
+                  if keyword in text
+
               ]
+
 
               if strong_hits:
 
                   return (
-                      "🔴 MUY FUERTE",
+                      "FUERTE",
                       25,
                       strong_hits
                   )
 
+
               if medium_hits:
 
                   return (
-                      "🟠 MEDIO",
+                      "MEDIO",
                       12,
                       medium_hits
                   )
 
+
               return (
-                  "⚪ DÉBIL",
+                  "NINGUNO",
                   0,
                   []
               )
 
-          # ==================================================
+
+          # ============================================================
           # EVALUAR SEÑALES ANTERIORES
-          # ==================================================
+          # ============================================================
 
           completed_updates = 0
+
 
           for signal in signals:
 
@@ -376,270 +419,241 @@ jobs:
 
                   continue
 
+
               symbol = signal.get(
                   "symbol"
               )
 
+
               if symbol not in market:
 
                   continue
+
 
               data = market.get(
                   symbol,
                   {}
               )
 
+
               candles = data.get(
                   "values",
                   []
               )
 
-              if len(candles) < 2:
+
+              if not candles:
 
                   continue
 
+
               try:
 
-                  entry_time = (
-                      datetime.fromisoformat(
-                          signal["timestamp"]
-                      )
+                  entry_time = datetime.fromisoformat(
+                      signal["timestamp"]
                   )
-
-                  elapsed = (
-                      now
-                      - entry_time
-                  ).total_seconds() / 60
 
                   entry_price = float(
                       signal["entry_price"]
                   )
 
-                  # Las velas vienen de más
-                  # reciente a más antigua.
-                  #
-                  # Para evaluar el futuro
-                  # respecto a la señal,
-                  # buscamos velas posteriores
-                  # mediante timestamp.
+              except Exception:
 
-                  future_prices = []
+                  continue
 
-                  for candle in candles:
+
+              # --------------------------------------------------------
+              # Buscar velas posteriores a la señal
+              # --------------------------------------------------------
+
+              future = []
+
+
+              for candle in candles:
+
+                  try:
 
                       candle_time = datetime.fromisoformat(
                           candle["datetime"]
-                          .replace(
-                              "Z",
-                              "+00:00"
-                          )
                       )
 
                       if (
                           candle_time
-                          >= entry_time
+                          > entry_time
                       ):
 
-                          try:
+                          future.append({
+                              "time":
+                                  candle_time,
 
-                              future_prices.append({
-                                  "time":
-                                      candle_time,
+                              "high":
+                                  float(
+                                      candle["high"]
+                                  ),
 
-                                  "high":
-                                      float(
-                                          candle["high"]
-                                      ),
+                              "low":
+                                  float(
+                                      candle["low"]
+                                  ),
 
-                                  "low":
-                                      float(
-                                          candle["low"]
-                                      ),
+                              "close":
+                                  float(
+                                      candle["close"]
+                                  )
+                          })
 
-                                  "close":
-                                      float(
-                                          candle["close"]
-                                      )
-                              })
-
-                          except:
-
-                              pass
-
-                  if not future_prices:
+                  except Exception:
 
                       continue
 
-                  highs = [
-                      x["high"]
-                      for x in future_prices
-                  ]
 
-                  lows = [
-                      x["low"]
-                      for x in future_prices
-                  ]
+              if not future:
 
-                  max_high = max(
-                      highs
-                  )
+                  continue
 
-                  min_low = min(
-                      lows
-                  )
+
+              # --------------------------------------------------------
+              # Datos disponibles hasta ahora
+              # --------------------------------------------------------
+
+              elapsed = (
+                  now - entry_time
+              ).total_seconds() / 60
+
+
+              highs = [
+                  item["high"]
+                  for item in future
+              ]
+
+
+              lows = [
+                  item["low"]
+                  for item in future
+              ]
+
+
+              if highs:
+
+                  maximum = max(highs)
 
                   max_gain = (
                       (
-                          max_high
-                          - entry_price
+                          maximum
+                          -
+                          entry_price
                       )
                       /
                       entry_price
                   ) * 100
-
-                  max_drawdown = (
-                      (
-                          min_low
-                          - entry_price
-                      )
-                      /
-                      entry_price
-                  ) * 100
-
-                  # ==========================================
-                  # OBJETIVOS
-                  # ==========================================
 
                   signal["max_gain"] = round(
                       max_gain,
                       2
                   )
 
+
+              if lows:
+
+                  minimum = min(lows)
+
+                  max_drawdown = (
+                      (
+                          minimum
+                          -
+                          entry_price
+                      )
+                      /
+                      entry_price
+                  ) * 100
+
                   signal["max_drawdown"] = round(
                       max_drawdown,
                       2
                   )
 
-                  if max_gain >= 5:
 
-                      signal["hit_5"] = True
+              # --------------------------------------------------------
+              # Objetivos
+              # --------------------------------------------------------
 
-                  if max_gain >= 10:
+              signal["hit_5"] = (
+                  signal.get(
+                      "max_gain",
+                      0
+                  ) >= 5
+              )
 
-                      signal["hit_10"] = True
 
-                  if max_gain >= 15:
+              signal["hit_10"] = (
+                  signal.get(
+                      "max_gain",
+                      0
+                  ) >= 10
+              )
 
-                      signal["hit_15"] = True
 
-                  # ==========================================
-                  # HORIZONTES
-                  # ==========================================
+              signal["hit_15"] = (
+                  signal.get(
+                      "max_gain",
+                      0
+                  ) >= 15
+              )
 
-                  checkpoints = [
-                      (
-                          "15m",
-                          15
-                      ),
-                      (
-                          "30m",
-                          30
-                      ),
-                      (
-                          "60m",
-                          60
-                      )
-                  ]
 
-                  for label, minutes in checkpoints:
+              # --------------------------------------------------------
+              # Finalizar después de 60 minutos
+              # --------------------------------------------------------
 
-                      if elapsed < minutes:
+              if elapsed >= 60:
 
-                          continue
+                  signal["completed"] = True
 
-                      candidates = [
-                          x
-                          for x in future_prices
-                          if (
-                              x["time"]
-                              - entry_time
-                          ).total_seconds()
-                          <= minutes * 60
-                      ]
-
-                      if not candidates:
-
-                          continue
-
-                      last = candidates[-1]
-
-                      result = (
-                          (
-                              last["close"]
-                              -
-                              entry_price
-                          )
-                          /
-                          entry_price
-                      ) * 100
-
-                      signal[
-                          f"return_{label}"
-                      ] = round(
-                          result,
-                          2
-                      )
-
-                  # ==========================================
-                  # FINALIZAR DESPUÉS DE 60 MIN
-                  # ==========================================
-
-                  if elapsed >= 60:
-
-                      signal[
-                          "completed"
-                      ] = True
-
-                      signal[
-                          "completed_at"
-                      ] = now.isoformat()
-
-                      completed_updates += 1
-
-              except Exception as e:
-
-                  print(
-                      f"⚠️ Error evaluando "
-                      f"señal: {e}"
+                  signal["completed_at"] = (
+                      now.isoformat()
                   )
 
-          # ==================================================
-          # ANALISIS DE MERCADO ACTUAL
-          # ==================================================
+                  completed_updates += 1
+
+
+          # ============================================================
+          # ANALIZAR MERCADO ACTUAL
+          # ============================================================
 
           opportunities = []
 
           errors = 0
 
+
           for symbol in symbols:
 
               try:
 
-                  if symbol not in market:
+                  data = market.get(
+                      symbol,
+                      {}
+                  )
 
-                      errors += 1
-                      continue
-
-                  data = market[symbol]
 
                   candles = data.get(
                       "values",
                       []
                   )
 
+
                   if len(candles) < 61:
 
+                      print(
+                          symbol,
+                          "sin suficientes velas"
+                      )
+
                       continue
+
+
+                  # ----------------------------------------------------
+                  # PRECIOS
+                  # ----------------------------------------------------
 
                   current = float(
                       candles[0]["close"]
@@ -661,50 +675,90 @@ jobs:
                       candles[60]["close"]
                   )
 
+
                   change5 = (
-                      (current - p5)
-                      / p5
+                      (
+                          current
+                          -
+                          p5
+                      )
+                      /
+                      p5
                   ) * 100
+
 
                   change15 = (
-                      (current - p15)
-                      / p15
+                      (
+                          current
+                          -
+                          p15
+                      )
+                      /
+                      p15
                   ) * 100
+
 
                   change30 = (
-                      (current - p30)
-                      / p30
+                      (
+                          current
+                          -
+                          p30
+                      )
+                      /
+                      p30
                   ) * 100
+
 
                   change60 = (
-                      (current - p60)
-                      / p60
+                      (
+                          current
+                          -
+                          p60
+                      )
+                      /
+                      p60
                   ) * 100
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # ACELERACIÓN
-                  # ==========================================
+                  # ----------------------------------------------------
 
-                  move_30_15 = (
-                      (p15 - p30)
-                      / p30
+                  move_old = (
+                      (
+                          p15
+                          -
+                          p30
+                      )
+                      /
+                      p30
                   ) * 100
 
-                  move_15_0 = (
-                      (current - p15)
-                      / p15
+
+                  move_recent = (
+                      (
+                          current
+                          -
+                          p15
+                      )
+                      /
+                      p15
                   ) * 100
+
 
                   acceleration = (
-                      move_15_0
-                      - move_30_15
+                      move_recent
+                      -
+                      move_old
                   )
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # VOLUMEN
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   volumes = []
+
 
                   for candle in candles:
 
@@ -712,15 +766,14 @@ jobs:
 
                           volumes.append(
                               float(
-                                  candle[
-                                      "volume"
-                                  ]
+                                  candle["volume"]
                               )
                           )
 
-                      except:
+                      except Exception:
 
                           pass
+
 
                   if len(volumes) >= 10:
 
@@ -733,6 +786,7 @@ jobs:
                               volumes[1:]
                           )
                       )
+
 
                       if average_volume > 0:
 
@@ -750,11 +804,13 @@ jobs:
 
                       volume_ratio = 0
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # MÁXIMO
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   highs = []
+
 
                   for candle in candles:
 
@@ -762,77 +818,95 @@ jobs:
 
                           highs.append(
                               float(
-                                  candle[
-                                      "high"
-                                  ]
+                                  candle["high"]
                               )
                           )
 
-                      except:
+                      except Exception:
 
                           pass
 
-                  high = (
-                      max(highs)
-                      if highs
-                      else current
-                  )
+
+                  if highs:
+
+                      highest = max(
+                          highs
+                      )
+
+                  else:
+
+                      highest = current
+
 
                   distance_high = (
                       (
-                          high
+                          highest
                           -
                           current
                       )
                       /
-                      high
+                      highest
                   ) * 100
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # SCORE
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   score = 0
 
+
                   if change30 >= 3:
+
                       score += 20
 
+
                   if change30 >= 5:
+
                       score += 10
+
 
                   if volume_ratio >= 3:
+
                       score += 15
 
+
                   if volume_ratio >= 5:
+
                       score += 10
+
 
                   if volume_ratio >= 8:
+
                       score += 5
+
 
                   if acceleration > 0:
+
                       score += 10
 
+
                   if acceleration >= 2:
+
                       score += 5
+
 
                   if distance_high <= 1:
+
                       score += 5
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # TIMING
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   if change30 >= 10:
 
-                      timing = (
-                          "🔴 EXTENDED"
-                      )
+                      timing = "EXTENDED"
 
                   elif change30 >= 7:
 
-                      timing = (
-                          "🟠 LATE"
-                      )
+                      timing = "LATE"
 
                   elif (
                       change30 >= 3
@@ -842,30 +916,26 @@ jobs:
                       volume_ratio >= 3
                   ):
 
-                      timing = (
-                          "🟢 EARLY"
-                      )
+                      timing = "EARLY"
 
                   elif change30 >= 3:
 
-                      timing = (
-                          "🟡 MOMENTUM"
-                      )
+                      timing = "MOMENTUM"
 
                   else:
 
-                      timing = (
-                          "⚪ NORMAL"
-                      )
+                      timing = "NORMAL"
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # MEMORIA
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   previous = state.get(
                       symbol,
                       {}
                   )
+
 
                   previous_score = float(
                       previous.get(
@@ -874,12 +944,14 @@ jobs:
                       )
                   )
 
+
                   previous_volume = float(
                       previous.get(
                           "volume_ratio",
                           0
                       )
                   )
+
 
                   previous_change = float(
                       previous.get(
@@ -888,10 +960,12 @@ jobs:
                       )
                   )
 
+
                   previous_timing = previous.get(
                       "timing",
-                      "⚪ NORMAL"
+                      "NORMAL"
                   )
+
 
                   score_delta = (
                       score
@@ -899,17 +973,20 @@ jobs:
                       previous_score
                   )
 
+
                   volume_delta = (
                       volume_ratio
                       -
                       previous_volume
                   )
 
+
                   price_delta = (
                       change30
                       -
                       previous_change
                   )
+
 
                   accelerating = (
 
@@ -921,9 +998,10 @@ jobs:
 
                       or
 
-                      price_delta >= 1.0
+                      price_delta >= 1
 
                   )
+
 
                   state_change = (
 
@@ -935,32 +1013,37 @@ jobs:
 
                       timing
                       !=
-                      "⚪ NORMAL"
+                      "NORMAL"
 
                   )
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # PENALIZACIÓN
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   adjusted_score = score
 
-                  if timing == "🟠 LATE":
+
+                  if timing == "LATE":
 
                       adjusted_score -= 10
 
-                  elif timing == "🔴 EXTENDED":
+
+                  elif timing == "EXTENDED":
 
                       adjusted_score -= 20
+
 
                   adjusted_score = max(
                       0,
                       adjusted_score
                   )
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # FILTRO
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   if not (
                       change30 >= 3
@@ -997,9 +1080,21 @@ jobs:
 
                       continue
 
-                  # ==========================================
-                  # NOTICIAS
-                  # ==========================================
+
+                  # ----------------------------------------------------
+                  # MARKET AUX
+                  # ----------------------------------------------------
+
+                  articles = []
+
+                  news_bonus = 0
+
+                  category = "NINGUNO"
+
+                  best_article = None
+
+                  news_hits = []
+
 
                   after = (
                       now
@@ -1009,11 +1104,14 @@ jobs:
                       "%Y-%m-%dT%H:%M"
                   )
 
+
                   news_params = urllib.parse.urlencode({
 
-                      "api_token": MX,
+                      "api_token":
+                          MX,
 
-                      "symbols": symbol,
+                      "symbols":
+                          symbol,
 
                       "filter_entities":
                           "true",
@@ -1035,23 +1133,26 @@ jobs:
 
                   })
 
+
                   news_url = (
                       "https://api.marketaux.com/"
                       "v1/news/all?"
                       + news_params
                   )
 
-                  news_request = urllib.request.Request(
-                      news_url,
-                      headers={
-                          "User-Agent":
-                          "OpportunityScanner/8.0"
-                      }
-                  )
-
-                  articles = []
 
                   try:
+
+                      news_request = (
+                          urllib.request.Request(
+                              news_url,
+                              headers={
+                                  "User-Agent":
+                                  "OpportunityScanner/8.0"
+                              }
+                          )
+                      )
+
 
                       with urllib.request.urlopen(
                           news_request,
@@ -1062,41 +1163,47 @@ jobs:
                               response
                           )
 
+
                       articles = news_data.get(
                           "data",
                           []
                       )
 
-                  except Exception as e:
+
+                  except Exception as error:
 
                       print(
-                          f"⚠️ News {symbol}: "
-                          f"{e}"
+                          "News error",
+                          symbol,
+                          error
                       )
 
-                  best = None
-                  news_bonus = 0
-                  category = (
-                      "⚪ SIN CATALIZADOR"
-                  )
-                  hits = []
 
                   for article in articles:
 
-                      cat, bonus, found = (
-                          classify(article)
+                      (
+                          news_type,
+                          bonus,
+                          hits
+                      ) = classify_news(
+                          article
                       )
+
 
                       if bonus > news_bonus:
 
-                          best = article
                           news_bonus = bonus
-                          category = cat
-                          hits = found
 
-                  # ==========================================
+                          category = news_type
+
+                          best_article = article
+
+                          news_hits = hits
+
+
+                  # ----------------------------------------------------
                   # SCORE FINAL
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   final_score = min(
                       100,
@@ -1105,39 +1212,31 @@ jobs:
                       news_bonus
                   )
 
+
                   if final_score >= 90:
 
-                      level = (
-                          "🔴 EXCEPCIONAL"
-                      )
+                      level = "EXCEPCIONAL"
 
                   elif final_score >= 80:
 
-                      level = (
-                          "🔴 MUY FUERTE"
-                      )
+                      level = "MUY FUERTE"
 
                   elif final_score >= 70:
 
-                      level = (
-                          "🟠 FUERTE"
-                      )
+                      level = "FUERTE"
 
                   elif final_score >= 55:
 
-                      level = (
-                          "🟡 INTERESANTE"
-                      )
+                      level = "INTERESANTE"
 
                   else:
 
-                      level = (
-                          "⚪ VIGILAR"
-                      )
+                      level = "VIGILAR"
 
-                  # ==========================================
-                  # GUARDAR CANDIDATA
-                  # ==========================================
+
+                  # ----------------------------------------------------
+                  # CANDIDATA
+                  # ----------------------------------------------------
 
                   opportunity = {
 
@@ -1171,9 +1270,6 @@ jobs:
                       "acceleration":
                           acceleration,
 
-                      "distance_high":
-                          distance_high,
-
                       "category":
                           category,
 
@@ -1186,48 +1282,50 @@ jobs:
                       "state_change":
                           state_change,
 
+                      "level":
+                          level,
+
                       "title":
                           (
-                              best.get(
+                              best_article.get(
                                   "title",
                                   ""
                               )
-                              if best
+                              if best_article
                               else ""
                           ),
 
                       "source":
                           (
-                              best.get(
+                              best_article.get(
                                   "source",
                                   ""
                               )
-                              if best
+                              if best_article
                               else ""
                           ),
 
                       "url":
                           (
-                              best.get(
+                              best_article.get(
                                   "url",
                                   ""
                               )
-                              if best
+                              if best_article
                               else ""
-                          ),
-
-                      "level":
-                          level
+                          )
 
                   }
+
 
                   opportunities.append(
                       opportunity
                   )
 
-                  # ==========================================
+
+                  # ----------------------------------------------------
                   # COOLDOWN
-                  # ==========================================
+                  # ----------------------------------------------------
 
                   last_alert_text = (
                       previous.get(
@@ -1236,7 +1334,9 @@ jobs:
                       )
                   )
 
+
                   cooldown_ok = True
+
 
                   if last_alert_text:
 
@@ -1248,6 +1348,7 @@ jobs:
                               )
                           )
 
+
                           minutes_since = (
                               (
                                   now
@@ -1257,17 +1358,20 @@ jobs:
                               / 60
                           )
 
+
                           if minutes_since < 60:
 
                               cooldown_ok = False
 
-                      except:
+
+                      except Exception:
 
                           pass
 
-                  # ==========================================
-                  # CREAR SEÑAL
-                  # ==========================================
+
+                  # ----------------------------------------------------
+                  # DECISIÓN DE ALERTA
+                  # ----------------------------------------------------
 
                   important = (
 
@@ -1285,23 +1389,23 @@ jobs:
 
                       and
 
-                      timing
-                      !=
-                      "🔴 EXTENDED"
+                      timing != "EXTENDED"
 
                   )
 
-                  if important and cooldown_ok:
 
-                      signal_id = (
-                          f"{symbol}_"
-                          f"{now.isoformat()}"
-                      )
+                  if important and cooldown_ok:
 
                       signal = {
 
                           "id":
-                              signal_id,
+                              (
+                                  symbol
+                                  +
+                                  "_"
+                                  +
+                                  now.isoformat()
+                              ),
 
                           "symbol":
                               symbol,
@@ -1347,88 +1451,124 @@ jobs:
 
                       }
 
+
                       signals.append(
                           signal
                       )
 
-                      print(
-                          f"📌 NUEVA SEÑAL "
-                          f"REGISTRADA: "
-                          f"{symbol}"
-                      )
 
-                      # ========================================
-                      # TELEGRAM
-                      # ========================================
+                      # ------------------------------------------------
+                      # MENSAJE TELEGRAM
+                      # ------------------------------------------------
 
                       message = (
                           "🚨 NUEVA SEÑAL V8\n\n"
 
-                          f"📈 {symbol}\n"
+                          "📈 "
+                          + symbol
+                          + "\n"
 
-                          f"🎯 Score: "
-                          f"{final_score}/100\n"
+                          "🎯 Score: "
+                          + str(
+                              int(
+                                  final_score
+                              )
+                          )
+                          + "/100\n"
 
-                          f"{level}\n\n"
+                          "🏷 "
+                          + level
+                          + "\n\n"
 
-                          f"⏱ {timing}\n"
+                          "⏱ "
+                          + timing
+                          + "\n"
 
-                          f"💰 ${current:.2f}\n"
+                          "💰 $"
+                          + f"{current:.2f}"
+                          + "\n"
 
-                          f"📊 30m: "
-                          f"{change30:+.2f}%\n"
+                          "📊 30m: "
+                          + f"{change30:+.2f}%"
+                          + "\n"
 
-                          f"🔥 Volumen: "
-                          f"{volume_ratio:.1f}x\n"
+                          "🔥 Volumen: "
+                          + f"{volume_ratio:.1f}x"
+                          + "\n"
 
-                          f"⚡ Aceleración: "
-                          f"{acceleration:+.2f}\n\n"
+                          "⚡ Aceleración: "
+                          + f"{acceleration:+.2f}"
+                          + "\n\n"
 
-                          f"📰 {category}\n\n"
+                          "📰 Catalizador: "
+                          + category
+                          + "\n\n"
 
-                          "🧪 SEÑAL REGISTRADA "
-                          "PARA MEDIR SU "
-                          "RESULTADO."
+                          "🧪 Señal registrada "
+                          "para medir el resultado."
                       )
 
-                      if best:
 
-                          message += (
-                              f"\n\n{best.get("
-                              "'title',"
-                              "''
-                              )}"
+                      if best_article:
+
+                          title = str(
+                              best_article.get(
+                                  "title",
+                                  ""
+                              )
                           )
 
-                          article_url = best.get(
-                              "url",
-                              ""
+
+                          if title:
+
+                              message += (
+                                  "\n\n"
+                                  + title
+                              )
+
+
+                          article_url = str(
+                              best_article.get(
+                                  "url",
+                                  ""
+                              )
                           )
+
 
                           if article_url:
 
                               message += (
-                                  f"\n{article_url}"
+                                  "\n"
+                                  + article_url
                               )
+
 
                       try:
 
-                          telegram(message)
+                          telegram(
+                              message
+                          )
 
                           last_alert_text = (
                               now.isoformat()
                           )
 
-                      except Exception as e:
-
                           print(
-                              f"⚠️ Telegram: "
-                              f"{e}"
+                              "ALERTA ENVIADA:",
+                              symbol
                           )
 
-                  # ==========================================
-                  # ESTADO
-                  # ==========================================
+                      except Exception as error:
+
+                          print(
+                              "Telegram error:",
+                              error
+                          )
+
+
+                  # ----------------------------------------------------
+                  # GUARDAR ESTADO
+                  # ----------------------------------------------------
 
                   state[symbol] = {
 
@@ -1452,87 +1592,112 @@ jobs:
 
                   }
 
-              except Exception as e:
+
+              except Exception as error:
 
                   print(
-                      f"⚠️ {symbol}: "
-                      f"{type(e).__name__}: "
-                      f"{e}"
+                      "ERROR",
+                      symbol,
+                      type(error).__name__,
+                      error
                   )
 
                   errors += 1
 
-          # ==================================================
-          # LIMITAR MEMORIA
-          # ==================================================
 
-          if len(signals) > 500:
-
-              signals = signals[-500:]
-
-          # ==================================================
-          # RANKING
-          # ==================================================
+          # ============================================================
+          # ORDENAR OPORTUNIDADES
+          # ============================================================
 
           opportunities.sort(
-              key=lambda x: x["score"],
+              key=lambda item:
+              item["score"],
               reverse=True
           )
 
-          # ==================================================
-          # ESTADÍSTICAS
-          # ==================================================
+
+          # ============================================================
+          # ESTADÍSTICAS HISTÓRICAS
+          # ============================================================
 
           completed = [
-              s
-              for s in signals
-              if s.get(
+
+              signal
+
+              for signal
+              in signals
+
+              if signal.get(
                   "completed",
                   False
               )
+
           ]
+
 
           total_completed = len(
               completed
           )
 
+
           hit5 = sum(
+
               1
-              for s in completed
-              if s.get(
+
+              for signal
+              in completed
+
+              if signal.get(
                   "hit_5",
                   False
               )
+
           )
 
+
           hit10 = sum(
+
               1
-              for s in completed
-              if s.get(
+
+              for signal
+              in completed
+
+              if signal.get(
                   "hit_10",
                   False
               )
+
           )
 
+
           hit15 = sum(
+
               1
-              for s in completed
-              if s.get(
+
+              for signal
+              in completed
+
+              if signal.get(
                   "hit_15",
                   False
               )
+
           )
 
-          # ==================================================
-          # TELEGRAM RESUMEN
-          # ==================================================
+
+          # ============================================================
+          # RESUMEN TELEGRAM
+          # ============================================================
 
           summary = (
               "📊 MARKET SCAN V8\n\n"
-              f"Grupo "
-              f"{group_index + 1}/"
-              f"{len(groups)}\n\n"
+              "Grupo "
+              + str(group_index + 1)
+              + "/"
+              + str(len(groups))
+              + "\n\n"
           )
+
 
           if opportunities:
 
@@ -1540,31 +1705,48 @@ jobs:
                   "🏆 TOP OPORTUNIDADES\n\n"
               )
 
+
               medals = [
                   "🥇",
                   "🥈",
                   "🥉"
               ]
 
-              for i, item in enumerate(
+
+              for index, item in enumerate(
                   opportunities[:5]
               ):
 
-                  medal = (
-                      medals[i]
-                      if i < 3
-                      else "▪️"
-                  )
+                  if index < 3:
+
+                      medal = medals[index]
+
+                  else:
+
+                      medal = "▪️"
+
 
                   summary += (
-                      f"{medal} "
-                      f"{item['symbol']} "
-                      f"— "
-                      f"{item['score']:.0f}/100\n"
-                      f"   {item['timing']} | "
-                      f"{item['change30']:+.2f}% | "
-                      f"Vol "
-                      f"{item['volume']:.1f}x\n"
+
+                      medal
+                      + " "
+                      + item["symbol"]
+                      + " — "
+                      + str(
+                          int(
+                              item["score"]
+                          )
+                      )
+                      + "/100\n"
+
+                      + "   "
+                      + item["timing"]
+                      + " | "
+                      + f"{item['change30']:+.2f}%"
+                      + " | Vol "
+                      + f"{item['volume']:.1f}x"
+                      + "\n"
+
                   )
 
           else:
@@ -1574,68 +1756,98 @@ jobs:
                   "destacables.\n"
               )
 
+
           summary += (
-              "\n🧪 RESULTADOS HISTÓRICOS "
-              "DEL RADAR\n\n"
+              "\n🧪 RESULTADOS DEL RADAR\n\n"
 
-              f"Señales evaluadas: "
-              f"{total_completed}\n"
+              "Señales evaluadas: "
+              + str(
+                  total_completed
+              )
+              + "\n"
 
-              f"🎯 +5%: "
-              f"{hit5}\n"
+              "🎯 +5%: "
+              + str(hit5)
+              + "\n"
 
-              f"🚀 +10%: "
-              f"{hit10}\n"
+              "🚀 +10%: "
+              + str(hit10)
+              + "\n"
 
-              f"🔥 +15%: "
-              f"{hit15}\n"
+              "🔥 +15%: "
+              + str(hit15)
+              + "\n"
           )
+
 
           if total_completed > 0:
 
               summary += (
+
                   "\n📈 Tasa +5%: "
-                  f"{hit5 / total_completed * 100:.1f}%\n"
+                  + f"{hit5 / total_completed * 100:.1f}%"
 
-                  "📈 Tasa +10%: "
-                  f"{hit10 / total_completed * 100:.1f}%\n"
+                  + "\n📈 Tasa +10%: "
+                  + f"{hit10 / total_completed * 100:.1f}%"
 
-                  "📈 Tasa +15%: "
-                  f"{hit15 / total_completed * 100:.1f}%\n"
+                  + "\n📈 Tasa +15%: "
+                  + f"{hit15 / total_completed * 100:.1f}%"
+
               )
 
+
           summary += (
-              "\n\n"
-              f"📡 Acciones: "
-              f"{len(symbols)}\n"
 
-              f"🔎 Candidatas: "
-              f"{len(opportunities)}\n"
+              "\n\n📡 Acciones: "
+              + str(
+                  len(symbols)
+              )
 
-              f"⚠️ Errores: "
-              f"{errors}\n"
+              + "\n🔎 Candidatas: "
+              + str(
+                  len(opportunities)
+              )
 
-              "\n🧠 Registro actualizado."
+              + "\n⚠️ Errores: "
+              + str(
+                  errors
+              )
+
+              + "\n🧠 Memoria actualizada."
+
           )
+
 
           try:
 
-              telegram(summary)
-
-              print(
-                  "📱 Resumen enviado"
+              telegram(
+                  summary
               )
 
-          except Exception as e:
-
               print(
-                  f"⚠️ Telegram resumen: "
-                  f"{e}"
+                  "Resumen Telegram enviado"
               )
 
-          # ==================================================
-          # GUARDAR ARCHIVOS
-          # ==================================================
+          except Exception as error:
+
+              print(
+                  "Error enviando resumen:",
+                  error
+              )
+
+
+          # ============================================================
+          # LIMITAR HISTORIAL
+          # ============================================================
+
+          if len(signals) > 500:
+
+              signals = signals[-500:]
+
+
+          # ============================================================
+          # GUARDAR MEMORIA
+          # ============================================================
 
           with open(
               STATE_FILE,
@@ -1650,6 +1862,7 @@ jobs:
                   ensure_ascii=False
               )
 
+
           with open(
               SIGNAL_FILE,
               "w",
@@ -1663,9 +1876,10 @@ jobs:
                   ensure_ascii=False
               )
 
-          # ==================================================
-          # COMMIT
-          # ==================================================
+
+          # ============================================================
+          # GIT
+          # ============================================================
 
           try:
 
@@ -1679,16 +1893,17 @@ jobs:
                   check=True
               )
 
+
               subprocess.run(
                   [
                       "git",
                       "config",
                       "user.email",
-                      "41898282+github-actions[bot]"
-                      "@users.noreply.github.com"
+                      "41898282+github-actions[bot]@users.noreply.github.com"
                   ],
                   check=True
               )
+
 
               subprocess.run(
                   [
@@ -1700,6 +1915,7 @@ jobs:
                   check=True
               )
 
+
               result = subprocess.run(
                   [
                       "git",
@@ -1709,6 +1925,7 @@ jobs:
                   ]
               )
 
+
               if result.returncode != 0:
 
                   subprocess.run(
@@ -1716,10 +1933,11 @@ jobs:
                           "git",
                           "commit",
                           "-m",
-                          "Update scanner data"
+                          "Update scanner V8 data"
                       ],
                       check=True
                   )
+
 
                   subprocess.run(
                       [
@@ -1729,74 +1947,85 @@ jobs:
                       check=True
                   )
 
+
                   print(
-                      "💾 Datos guardados"
+                      "Memoria guardada"
                   )
 
-          except Exception as e:
+
+              else:
+
+                  print(
+                      "Sin cambios que guardar"
+                  )
+
+
+          except Exception as error:
 
               print(
-                  "⚠️ Error guardando "
-                  "datos:"
+                  "Error Git:",
+                  error
               )
 
-              print(e)
 
-          # ==================================================
-          # RESUMEN FINAL
-          # ==================================================
+          # ============================================================
+          # RESULTADO FINAL
+          # ============================================================
 
           print("=" * 70)
 
           print(
-              "🏆 TOP OPORTUNIDADES"
+              "TOP OPORTUNIDADES"
           )
+
 
           for item in opportunities[:5]:
 
               print(
-                  f"{item['symbol']} | "
-                  f"{item['score']:.0f}/100 | "
-                  f"{item['timing']} | "
-                  f"{item['change30']:+.2f}% | "
-                  f"{item['volume']:.1f}x"
+
+                  item["symbol"]
+                  + " | "
+                  + str(
+                      int(
+                          item["score"]
+                      )
+                  )
+                  + "/100 | "
+                  + item["timing"]
+                  + " | "
+                  + f"{item['change30']:+.2f}%"
+                  + " | Vol "
+                  + f"{item['volume']:.1f}x"
+
               )
 
-          print()
-
-          print(
-              f"🧪 Señales evaluadas: "
-              f"{total_completed}"
-          )
-
-          print(
-              f"🎯 +5%: {hit5}"
-          )
-
-          print(
-              f"🚀 +10%: {hit10}"
-          )
-
-          print(
-              f"🔥 +15%: {hit15}"
-          )
 
           print()
 
           print(
-              "📁 Archivos:"
+              "Señales evaluadas:",
+              total_completed
           )
 
           print(
-              " - scanner_state.json"
+              "+5%:",
+              hit5
           )
 
           print(
-              " - signal_log.json"
+              "+10%:",
+              hit10
           )
 
           print(
-              "✅ V8 TERMINADA"
+              "+15%:",
+              hit15
+          )
+
+          print()
+
+          print(
+              "V8 TERMINADA"
           )
 
           print("=" * 70)
