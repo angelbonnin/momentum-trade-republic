@@ -23,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Opportunity Scanner
+      - name: Opportunity Scanner V7
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
@@ -114,7 +114,7 @@ jobs:
           symbols = groups[group_index]
 
           print("=" * 70)
-          print("🚨 OPPORTUNITY SCANNER V6")
+          print("🚨 OPPORTUNITY SCANNER V7")
           print("=" * 70)
 
           print(
@@ -203,7 +203,7 @@ jobs:
               url,
               headers={
                   "User-Agent":
-                  "OpportunityScanner/6.0"
+                  "OpportunityScanner/7.0"
               }
           )
 
@@ -223,12 +223,8 @@ jobs:
 
               raise SystemExit(1)
 
-          candidates = 0
-          alerts = 0
-          errors = 0
-
           # ==================================================
-          # CATALIZADORES
+          # KEYWORDS
           # ==================================================
 
           strong = [
@@ -309,6 +305,14 @@ jobs:
                   0,
                   []
               )
+
+          # ==================================================
+          # LISTA DE CANDIDATAS
+          # ==================================================
+
+          opportunities = []
+
+          errors = 0
 
           # ==================================================
           # ANALISIS
@@ -393,11 +397,6 @@ jobs:
                   # ==================================================
                   # ACELERACION
                   # ==================================================
-
-                  move_60_30 = (
-                      (p30 - p60)
-                      / p60
-                  ) * 100
 
                   move_30_15 = (
                       (p15 - p30)
@@ -522,7 +521,7 @@ jobs:
                       score += 5
 
                   # ==================================================
-                  # MOMENTO
+                  # TIMING
                   # ==================================================
 
                   if change30 >= 10:
@@ -574,11 +573,6 @@ jobs:
                       )
                   )
 
-                  previous_timing = previous.get(
-                      "timing",
-                      "⚪ NORMAL"
-                  )
-
                   previous_change30 = float(
                       previous.get(
                           "change30",
@@ -586,9 +580,10 @@ jobs:
                       )
                   )
 
-                  # ==================================================
-                  # CAMBIO DESDE LA EJECUCION ANTERIOR
-                  # ==================================================
+                  previous_timing = previous.get(
+                      "timing",
+                      "⚪ NORMAL"
+                  )
 
                   score_delta = (
                       score
@@ -613,27 +608,11 @@ jobs:
                       price_delta >= 1.0
                   )
 
-                  # ==================================================
-                  # TRANSICION DE ESTADO
-                  # ==================================================
-
-                  state_change = False
-
-                  if (
+                  state_change = (
                       previous_timing != timing
                       and
                       timing != "⚪ NORMAL"
-                  ):
-
-                      state_change = True
-
-                  if (
-                      timing == "🟢 EARLY"
-                      and
-                      accelerating
-                  ):
-
-                      state_change = True
+                  )
 
                   # ==================================================
                   # PENALIZACION
@@ -653,38 +632,22 @@ jobs:
 
                       adjusted_score = 0
 
-                  print(
-                      f"{symbol} | "
-                      f"30m {change30:+.2f}% | "
-                      f"Vol {volume_ratio:.1f}x | "
-                      f"{timing} | "
-                      f"Score {adjusted_score} | "
-                      f"ΔScore {score_delta:+.0f} | "
-                      f"Accel "
-                      f"{accelerating}"
-                  )
-
                   # ==================================================
                   # FILTRO
                   # ==================================================
 
-                  qualifies = (
+                  if not (
                       change30 >= 3
                       and
                       volume_ratio >= 3
                       and
                       adjusted_score >= 45
-                  )
-
-                  if not qualifies:
-
-                      # Guardamos igualmente
-                      # el estado para la siguiente
-                      # ejecución.
+                  ):
 
                       state[symbol] = {
 
-                          "score": score,
+                          "score":
+                              score,
 
                           "volume_ratio":
                               volume_ratio,
@@ -708,21 +671,18 @@ jobs:
 
                       continue
 
-                  candidates += 1
-
                   print(
-                      f"🔎 CANDIDATA: "
-                      f"{symbol}"
+                      f"🔎 CANDIDATA "
+                      f"{symbol} | "
+                      f"Score {adjusted_score}"
                   )
 
                   # ==================================================
-                  # MARKETaux
+                  # MARKETAUX
                   # ==================================================
 
                   after = (
-                      datetime.now(
-                          timezone.utc
-                      )
+                      now
                       -
                       timedelta(hours=3)
                   ).strftime(
@@ -765,7 +725,7 @@ jobs:
                       news_url,
                       headers={
                           "User-Agent":
-                              "OpportunityScanner/6.0"
+                          "OpportunityScanner/7.0"
                       }
                   )
 
@@ -793,14 +753,17 @@ jobs:
                       )
 
                   # ==================================================
-                  # MEJOR NOTICIA
+                  # MEJOR CATALIZADOR
                   # ==================================================
 
                   best = None
+
                   news_bonus = 0
+
                   category = (
                       "⚪ SIN CATALIZADOR"
                   )
+
                   hits = []
 
                   for article in articles:
@@ -812,8 +775,11 @@ jobs:
                       if bonus > news_bonus:
 
                           best = article
+
                           news_bonus = bonus
+
                           category = cat
+
                           hits = found
 
                   # ==================================================
@@ -864,12 +830,46 @@ jobs:
                       )
 
                   # ==================================================
-                  # ALERTA NUEVA
+                  # NOTICIA
                   # ==================================================
 
-                  last_alert_text = previous.get(
-                      "last_alert",
-                      ""
+                  if best:
+
+                      title = best.get(
+                          "title",
+                          "Sin título"
+                      )
+
+                      source = best.get(
+                          "source",
+                          "Desconocida"
+                      )
+
+                      article_url = best.get(
+                          "url",
+                          ""
+                      )
+
+                  else:
+
+                      title = (
+                          "Sin catalizador "
+                          "relevante."
+                      )
+
+                      source = ""
+
+                      article_url = ""
+
+                  # ==================================================
+                  # COOLDOWN
+                  # ==================================================
+
+                  last_alert_text = (
+                      previous.get(
+                          "last_alert",
+                          ""
+                      )
                   )
 
                   try:
@@ -903,71 +903,39 @@ jobs:
                           cooldown_ok = False
 
                   # ==================================================
-                  # REGLA DE ALERTA
+                  # ALERTA
                   # ==================================================
 
-                  important_alert = (
+                  important = (
 
                       final_score >= 70
 
                       and
 
                       (
-                          state_change
-                          or
                           accelerating
+                          or
+                          state_change
                           or
                           news_bonus >= 25
                       )
 
+                      and
+
+                      timing != "🔴 EXTENDED"
+
                   )
 
-                  # No perseguimos acciones
-                  # extremadamente extendidas.
+                  send_alert = (
+                      important
+                      and
+                      cooldown_ok
+                  )
 
-                  if timing == "🔴 EXTENDED":
-
-                      important_alert = False
-
-                  # ==================================================
-                  # NOTICIA
-                  # ==================================================
-
-                  if best:
-
-                      title = best.get(
-                          "title",
-                          "Sin título"
-                      )
-
-                      source = best.get(
-                          "source",
-                          "Desconocida"
-                      )
-
-                      article_url = best.get(
-                          "url",
-                          ""
-                      )
-
-                  else:
-
-                      title = (
-                          "No se detectó "
-                          "catalizador reciente."
-                      )
-
-                      source = ""
-                      article_url = ""
-
-                  # ==================================================
-                  # TELEGRAM
-                  # ==================================================
-
-                  if important_alert and cooldown_ok:
+                  if send_alert:
 
                       message = (
-                          "🚨 ALERTA DE ACELERACIÓN\n\n"
+                          "🚨 TOP OPORTUNIDAD\n\n"
 
                           f"📈 {symbol}\n"
 
@@ -976,38 +944,35 @@ jobs:
 
                           f"{level}\n\n"
 
-                          f"⏱ ESTADO: "
+                          f"⏱ MOMENTO: "
                           f"{timing}\n"
 
-                          f"🔄 ANTERIOR: "
+                          f"🔄 ESTADO ANTERIOR: "
                           f"{previous_timing}\n\n"
 
                           f"💰 Precio: "
                           f"${current:.2f}\n"
 
-                          f"📊 5 min: "
+                          f"📊 5m: "
                           f"{change5:+.2f}%\n"
 
-                          f"📊 15 min: "
+                          f"📊 15m: "
                           f"{change15:+.2f}%\n"
 
-                          f"📊 30 min: "
+                          f"📊 30m: "
                           f"{change30:+.2f}%\n"
 
-                          f"📊 60 min: "
+                          f"📊 60m: "
                           f"{change60:+.2f}%\n\n"
 
                           f"🔥 Volumen: "
                           f"{volume_ratio:.1f}x\n"
 
-                          f"📈 Volumen anterior: "
+                          f"📈 Vol. anterior: "
                           f"{previous_volume:.1f}x\n"
 
                           f"⚡ Aceleración: "
-                          f"{acceleration:+.2f}\n"
-
-                          f"📈 Distancia máximo: "
-                          f"{distance_high:.2f}%\n\n"
+                          f"{acceleration:+.2f}\n\n"
 
                           f"📰 CATALIZADOR: "
                           f"{category}\n"
@@ -1048,7 +1013,8 @@ jobs:
                       message += (
                           "\n⚠️ Radar de "
                           "oportunidades. "
-                          "No es una recomendación "
+                          "No es una "
+                          "recomendación "
                           "automática de compra."
                       )
 
@@ -1056,42 +1022,36 @@ jobs:
 
                           telegram(message)
 
-                          alerts += 1
-
                           print(
-                              f"📱 ALERTA ENVIADA: "
+                              f"🚨 ALERTA: "
                               f"{symbol}"
+                          )
+
+                          last_alert_text = (
+                              now.isoformat()
                           )
 
                       except Exception as e:
 
                           print(
-                              f"❌ TELEGRAM "
+                              f"❌ Telegram "
                               f"{symbol}: {e}"
                           )
 
-                      current_last_alert = (
-                          now.isoformat()
-                      )
-
                   else:
 
-                      current_last_alert = (
-                          last_alert_text
-                      )
+                      if not cooldown_ok:
 
-                      if not important_alert:
+                          print(
+                              f"🔕 {symbol}: "
+                              "cooldown"
+                          )
+
+                      else:
 
                           print(
                               f"ℹ️ {symbol}: "
                               "sin nueva alerta"
-                          )
-
-                      elif not cooldown_ok:
-
-                          print(
-                              f"🔕 {symbol}: "
-                              "cooldown activo"
                           )
 
                   # ==================================================
@@ -1116,7 +1076,7 @@ jobs:
                           now.isoformat(),
 
                       "last_alert":
-                          current_last_alert
+                          last_alert_text
 
                   }
 
@@ -1129,6 +1089,157 @@ jobs:
                   )
 
                   errors += 1
+
+          # ==================================================
+          # RANKING
+          # ==================================================
+
+          # En esta V7 el ranking se construye
+          # a partir de los estados que acabamos
+          # de actualizar.
+
+          ranking = []
+
+          for symbol in symbols:
+
+              item = state.get(
+                  symbol,
+                  {}
+              )
+
+              try:
+
+                  ranking.append({
+
+                      "symbol":
+                          symbol,
+
+                      "score":
+                          float(
+                              item.get(
+                                  "score",
+                                  0
+                              )
+                          ),
+
+                      "volume":
+                          float(
+                              item.get(
+                                  "volume_ratio",
+                                  0
+                              )
+                          ),
+
+                      "change":
+                          float(
+                              item.get(
+                                  "change30",
+                                  0
+                              )
+                          ),
+
+                      "timing":
+                          item.get(
+                              "timing",
+                              "⚪ NORMAL"
+                          )
+
+                  })
+
+              except:
+
+                  pass
+
+          ranking.sort(
+              key=lambda x: x["score"],
+              reverse=True
+          )
+
+          top = [
+              x for x in ranking
+              if x["score"] >= 45
+          ]
+
+          # ==================================================
+          # RESUMEN TELEGRAM
+          # ==================================================
+
+          summary = (
+              "📊 MARKET SCAN V7\n\n"
+              f"Grupo "
+              f"{group_index + 1}/"
+              f"{len(groups)}\n\n"
+          )
+
+          if top:
+
+              summary += (
+                  "🏆 TOP OPORTUNIDADES\n\n"
+              )
+
+              medals = [
+                  "🥇",
+                  "🥈",
+                  "🥉"
+              ]
+
+              for i, item in enumerate(
+                  top[:5]
+              ):
+
+                  medal = (
+                      medals[i]
+                      if i < 3
+                      else "▪️"
+                  )
+
+                  summary += (
+                      f"{medal} "
+                      f"{item['symbol']} — "
+                      f"{item['score']:.0f}/100\n"
+                      f"   {item['timing']} | "
+                      f"+{item['change']:.2f}% | "
+                      f"Vol "
+                      f"{item['volume']:.1f}x\n"
+                  )
+
+          else:
+
+              summary += (
+                  "😴 Sin oportunidades "
+                  "destacables.\n"
+              )
+
+          summary += (
+              "\n📡 Acciones analizadas: "
+              f"{len(symbols)}\n"
+              f"🔎 Candidatas: "
+              f"{len(top)}\n"
+              f"⚠️ Errores: "
+              f"{errors}\n\n"
+              "🧠 Memoria actualizada."
+          )
+
+          # ==================================================
+          # ENVIAR RESUMEN
+          # ==================================================
+
+          try:
+
+              telegram(summary)
+
+              print(
+                  "📱 Resumen enviado"
+              )
+
+          except Exception as e:
+
+              print(
+                  "⚠️ No se pudo enviar "
+                  "resumen:"
+              )
+
+              print(e)
 
           # ==================================================
           # GUARDAR MEMORIA
@@ -1148,7 +1259,7 @@ jobs:
               )
 
           # ==================================================
-          # COMMIT AUTOMATICO
+          # COMMIT
           # ==================================================
 
           try:
@@ -1219,32 +1330,48 @@ jobs:
               else:
 
                   print(
-                      "ℹ️ Sin cambios de memoria"
+                      "ℹ️ Sin cambios"
                   )
 
           except Exception as e:
 
               print(
-                  "⚠️ No se pudo guardar "
-                  "la memoria:"
+                  "⚠️ Error guardando "
+                  "memoria:"
               )
 
               print(e)
 
           # ==================================================
-          # RESUMEN
+          # FINAL
           # ==================================================
 
           print("=" * 70)
 
           print(
-              f"🎯 Candidatas: "
-              f"{candidates}"
+              "🏆 TOP 5"
+          )
+
+          for item in top[:5]:
+
+              print(
+                  f"{item['symbol']} | "
+                  f"{item['score']:.0f}/100 | "
+                  f"{item['timing']} | "
+                  f"{item['change']:+.2f}% | "
+                  f"{item['volume']:.1f}x"
+              )
+
+          print()
+
+          print(
+              f"📊 Acciones: "
+              f"{len(symbols)}"
           )
 
           print(
-              f"🚨 Alertas nuevas: "
-              f"{alerts}"
+              f"🎯 Candidatas: "
+              f"{len(top)}"
           )
 
           print(
@@ -1253,11 +1380,7 @@ jobs:
           )
 
           print(
-              "🧠 MEMORIA ACTUALIZADA"
-          )
-
-          print(
-              "✅ ESCANEO TERMINADO"
+              "✅ V7 TERMINADA"
           )
 
           print("=" * 70)
