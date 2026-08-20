@@ -1,22 +1,16 @@
-name: Opportunity Scanner
+name: Marketaux Test
 
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "*/15 13-19 * * 1-5"
-
 jobs:
-  scanner:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Escanear oportunidades
+      - name: Probar Marketaux
         env:
-          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RUN_NUMBER: ${{ github.run_number }}
+          MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
 
         run: |
           python - <<'PY'
@@ -25,574 +19,90 @@ jobs:
           import urllib.request
           import json
 
-          API_KEY = os.environ["TWELVE_DATA_API_KEY"]
-          BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-          CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-
-          run_number = int(
-              os.environ.get("RUN_NUMBER", "1")
-          )
-
-          # ==========================================
-          # UNIVERSO DE ACCIONES
-          # ==========================================
-
-          GROUPS = [
-
-              [
-                  "NVDA",
-                  "AMD",
-                  "TSLA",
-                  "PLTR",
-                  "COIN",
-                  "HOOD",
-                  "MSTR",
-                  "SMCI"
-              ],
-
-              [
-                  "APP",
-                  "ARM",
-                  "AVGO",
-                  "MU",
-                  "MRVL",
-                  "TSM",
-                  "QCOM",
-                  "INTC"
-              ],
-
-              [
-                  "AMZN",
-                  "META",
-                  "NFLX",
-                  "GOOG",
-                  "GOOGL",
-                  "AAPL",
-                  "MSFT",
-                  "AMAT"
-              ],
-
-              [
-                  "LRCX",
-                  "CRWD",
-                  "PANW",
-                  "SNOW",
-                  "DDOG",
-                  "NET",
-                  "RBLX",
-                  "SHOP"
-              ],
-
-              [
-                  "UBER",
-                  "ABNB",
-                  "MELI",
-                  "CVNA",
-                  "RIVN",
-                  "NIO",
-                  "SOFI",
-                  "MARA"
-              ]
-
-          ]
-
-          group_index = (
-              (run_number - 1)
-              % len(GROUPS)
-          )
-
-          symbols = GROUPS[group_index]
-
-          print("=" * 60)
-          print("🚨 OPPORTUNITY SCANNER")
-          print("=" * 60)
-
-          print(
-              f"Grupo: "
-              f"{group_index + 1}/"
-              f"{len(GROUPS)}"
-          )
-
-          print(
-              "Acciones: "
-              + ", ".join(symbols)
-          )
-
-          print("=" * 60)
-
-          # ==========================================
-          # TELEGRAM
-          # ==========================================
-
-          def send_telegram(message):
-
-              url = (
-                  "https://api.telegram.org/"
-                  f"bot{BOT_TOKEN}/sendMessage"
-              )
-
-              data = urllib.parse.urlencode({
-
-                  "chat_id": CHAT_ID,
-
-                  "text": message
-
-              }).encode()
-
-              request = urllib.request.Request(
-
-                  url,
-
-                  data=data
-
-              )
-
-              with urllib.request.urlopen(
-
-                  request,
-
-                  timeout=20
-
-              ) as response:
-
-                  return response.read().decode()
-
-          # ==========================================
-          # TWELVE DATA
-          # ==========================================
+          API_KEY = os.environ["MARKETAUX_API_KEY"]
 
           params = urllib.parse.urlencode({
-
-              "symbol":
-                  ",".join(symbols),
-
-              "interval":
-                  "1min",
-
-              "outputsize":
-                  "61",
-
-              "apikey":
-                  API_KEY
-
+              "api_token": API_KEY,
+              "symbols": "MRNA",
+              "filter_entities": "true",
+              "language": "en",
+              "limit": "5"
           })
 
           url = (
-              "https://api.twelvedata.com/time_series?"
+              "https://api.marketaux.com/v1/news/all?"
               + params
           )
 
           request = urllib.request.Request(
-
               url,
-
               headers={
                   "User-Agent":
                       "OpportunityScanner/1.0"
               }
-
           )
 
           try:
 
               with urllib.request.urlopen(
-
                   request,
-
                   timeout=30
-
               ) as response:
 
                   data = json.load(response)
 
-          except Exception as error:
+              print("=" * 60)
+              print("MARKETAUX")
+              print("=" * 60)
+
+              if "data" not in data:
+
+                  print("❌ No se recibió el campo data")
+                  print(data)
+                  raise SystemExit(1)
+
+              articles = data["data"]
 
               print(
-                  "❌ ERROR TWELVE DATA"
+                  f"Noticias recibidas: "
+                  f"{len(articles)}"
               )
 
+              print()
+
+              for article in articles:
+
+                  title = article.get(
+                      "title",
+                      "Sin título"
+                  )
+
+                  source = article.get(
+                      "source",
+                      "Desconocida"
+                  )
+
+                  published = article.get(
+                      "published_at",
+                      "Fecha desconocida"
+                  )
+
+                  print("📰", title)
+                  print("Fuente:", source)
+                  print("Fecha:", published)
+                  print("-" * 60)
+
+              print()
+              print("✅ PRUEBA COMPLETADA")
+
+          except Exception as error:
+
+              print("❌ ERROR MARKETAUX")
               print(
                   type(error).__name__
               )
-
-              print(
-                  str(error)
-              )
+              print(str(error))
 
               raise SystemExit(1)
-
-          # ==========================================
-          # CONTADORES
-          # ==========================================
-
-          candidates = 0
-          errors = 0
-
-          # ==========================================
-          # ANALISIS
-          # ==========================================
-
-          for symbol in symbols:
-
-              try:
-
-                  if symbol not in data:
-
-                      print(
-                          f"❌ {symbol}: "
-                          "sin datos"
-                      )
-
-                      errors += 1
-
-                      continue
-
-                  symbol_data = data[symbol]
-
-                  if "values" not in symbol_data:
-
-                      print(
-                          f"❌ {symbol}: "
-                          "sin velas"
-                      )
-
-                      errors += 1
-
-                      continue
-
-                  values = symbol_data["values"]
-
-                  if len(values) < 61:
-
-                      print(
-                          f"❌ {symbol}: "
-                          "datos insuficientes"
-                      )
-
-                      errors += 1
-
-                      continue
-
-                  # =================================
-                  # PRECIOS
-                  # =================================
-
-                  current_price = float(
-                      values[0]["close"]
-                  )
-
-                  price_30m = float(
-                      values[30]["close"]
-                  )
-
-                  price_60m = float(
-                      values[60]["close"]
-                  )
-
-                  # =================================
-                  # MOVIMIENTO 30 MIN
-                  # =================================
-
-                  change_30m = (
-
-                      (
-                          current_price
-                          - price_30m
-                      )
-                      / price_30m
-
-                  ) * 100
-
-                  # =================================
-                  # MOVIMIENTO 60 MIN
-                  # =================================
-
-                  change_60m = (
-
-                      (
-                          current_price
-                          - price_60m
-                      )
-                      / price_60m
-
-                  ) * 100
-
-                  # =================================
-                  # ACELERACION
-                  # =================================
-
-                  first_half = (
-
-                      (
-                          price_30m
-                          - price_60m
-                      )
-                      / price_60m
-
-                  ) * 100
-
-                  second_half = (
-
-                      (
-                          current_price
-                          - price_30m
-                      )
-                      / price_30m
-
-                  ) * 100
-
-                  acceleration = (
-                      second_half
-                      - first_half
-                  )
-
-                  # =================================
-                  # MAXIMO 60 MIN
-                  # =================================
-
-                  highs = []
-
-                  for candle in values:
-
-                      try:
-
-                          highs.append(
-                              float(
-                                  candle["high"]
-                              )
-                          )
-
-                      except:
-
-                          pass
-
-                  if highs:
-
-                      max_price = max(highs)
-
-                  else:
-
-                      max_price = current_price
-
-                  distance_from_high = (
-
-                      (
-                          max_price
-                          - current_price
-                      )
-                      / max_price
-
-                  ) * 100
-
-                  # =================================
-                  # VOLUMEN
-                  # =================================
-
-                  volumes = []
-
-                  for candle in values:
-
-                      if "volume" in candle:
-
-                          try:
-
-                              volumes.append(
-                                  float(
-                                      candle[
-                                          "volume"
-                                      ]
-                                  )
-                              )
-
-                          except:
-
-                              pass
-
-                  if len(volumes) >= 2:
-
-                      current_volume = volumes[0]
-
-                      historical_volume = (
-                          volumes[1:]
-                      )
-
-                      average_volume = (
-
-                          sum(
-                              historical_volume
-                          )
-                          /
-                          len(
-                              historical_volume
-                          )
-
-                      )
-
-                      if average_volume > 0:
-
-                          volume_ratio = (
-
-                              current_volume
-                              /
-                              average_volume
-
-                          )
-
-                      else:
-
-                          volume_ratio = 0
-
-                  else:
-
-                      volume_ratio = 0
-
-                  # =================================
-                  # PUNTUACION
-                  # =================================
-
-                  score = 0
-
-                  # Movimiento
-                  if change_30m >= 3:
-                      score += 25
-
-                  if change_30m >= 5:
-                      score += 10
-
-                  # Volumen
-                  if volume_ratio >= 4:
-                      score += 25
-
-                  if volume_ratio >= 8:
-                      score += 10
-
-                  # Aceleracion
-                  if acceleration > 0:
-                      score += 10
-
-                  if acceleration >= 2:
-                      score += 10
-
-                  # Cerca del maximo
-                  if distance_from_high <= 1:
-                      score += 10
-
-                  # =================================
-                  # MOSTRAR
-                  # =================================
-
-                  print(
-                      f"{symbol} | "
-                      f"30m "
-                      f"{change_30m:+.2f}% | "
-                      f"60m "
-                      f"{change_60m:+.2f}% | "
-                      f"Vol "
-                      f"{volume_ratio:.1f}x | "
-                      f"Accel "
-                      f"{acceleration:+.2f} | "
-                      f"High "
-                      f"{distance_from_high:.2f}% | "
-                      f"Score "
-                      f"{score}/100"
-                  )
-
-                  # =================================
-                  # CANDIDATA
-                  # =================================
-
-                  if (
-
-                      change_30m >= 3
-
-                      and
-
-                      volume_ratio >= 4
-
-                      and
-
-                      score >= 50
-
-                  ):
-
-                      candidates += 1
-
-                      message = (
-
-                          "🚨 OPORTUNIDAD MOMENTUM\n\n"
-
-                          f"📈 {symbol}\n\n"
-
-                          f"🎯 SCORE: "
-                          f"{score}/100\n\n"
-
-                          f"📊 30 min: "
-                          f"{change_30m:+.2f}%\n"
-
-                          f"📊 60 min: "
-                          f"{change_60m:+.2f}%\n"
-
-                          f"🔥 Volumen: "
-                          f"{volume_ratio:.1f}x\n"
-
-                          f"⚡ Aceleración: "
-                          f"{acceleration:+.2f}\n"
-
-                          f"📈 Distancia máximo: "
-                          f"{distance_from_high:.2f}%\n\n"
-
-                          "⚠️ Revisar gráfico y "
-                          "catalizador antes de operar."
-                      )
-
-                      try:
-
-                          send_telegram(
-                              message
-                          )
-
-                          print(
-                              f"📱 ALERTA: "
-                              f"{symbol}"
-                          )
-
-                      except Exception as error:
-
-                          print(
-                              "❌ ERROR TELEGRAM"
-                          )
-
-                          print(error)
-
-              except Exception as error:
-
-                  print(
-                      f"⚠️ {symbol}: "
-                      f"{error}"
-                  )
-
-                  errors += 1
-
-          # ==========================================
-          # RESUMEN
-          # ==========================================
-
-          print("=" * 60)
-
-          print(
-              f"🎯 Candidatas: "
-              f"{candidates}"
-          )
-
-          print(
-              f"⚠️ Errores: "
-              f"{errors}"
-          )
-
-          print(
-              "✅ ESCANEO TERMINADO"
-          )
-
-          print("=" * 60)
 
           PY
