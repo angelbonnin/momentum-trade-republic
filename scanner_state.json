@@ -446,5 +446,69 @@
     "timing": "NORMAL",
     "updated": "2026-08-20T20:57:22.384965+00:00",
     "last_alert": ""
+  },
+  "NVDA": {
+    "score": 10,
+    "volume_ratio": 1.2771393092868495,
+    "change30": -0.18394895378247175,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
+  },
+  "AMD": {
+    "score": 40,
+    "volume_ratio": 10.837900895177723,
+    "change30": 0.6897587305487302,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
+  },
+  "AVGO": {
+    "score": 30,
+    "volume_ratio": 6.244480674390954,
+    "change30": -0.08915008297560661,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
+  },
+  "MU": {
+    "score": 30,
+    "volume_ratio": 4.258720050282153,
+    "change30": 0.6418496900099281,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
+  },
+  "MRVL": {
+    "score": 40,
+    "volume_ratio": 5.18554960826474,
+    "change30": 0.8269730699729796,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
+  },
+  "ARM": {
+    "score": 35,
+    "volume_ratio": 16.14516813408295,
+    "change30": 0.6987991967871535,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
+  },
+  "SMCI": {
+    "score": 15,
+    "volume_ratio": 3.726302155435007,
+    "change30": -0.612828544191751,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
+  },
+  "INTC": {
+    "score": 20,
+    "volume_ratio": 3.7281050416466988,
+    "change30": -0.29755464185241903,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T21:58:53.040664+00:00",
+    "last_alert": ""
   }
 }
