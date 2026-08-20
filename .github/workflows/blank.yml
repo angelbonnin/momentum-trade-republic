@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: cron: "*/15 13-19 * * 1-5"
 
 jobs:
   momentum:
