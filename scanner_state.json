@@ -382,5 +382,69 @@
     "timing": "NORMAL",
     "updated": "2026-08-20T19:18:24.621688+00:00",
     "last_alert": ""
+  },
+  "T": {
+    "score": 35,
+    "volume_ratio": 11.417686076418327,
+    "change30": 0.1591089896579123,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
+  },
+  "VZ": {
+    "score": 35,
+    "volume_ratio": 17.924442460741,
+    "change30": 0.0,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
+  },
+  "TMUS": {
+    "score": 15,
+    "volume_ratio": 3.587102502913591,
+    "change30": -0.06618133686300715,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
+  },
+  "CMCSA": {
+    "score": 25,
+    "volume_ratio": 5.350729701079247,
+    "change30": -0.13230013230011942,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
+  },
+  "DIS": {
+    "score": 15,
+    "volume_ratio": 4.655071638134845,
+    "change30": -0.43587127886487886,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
+  },
+  "WBD": {
+    "score": 25,
+    "volume_ratio": 6.221867049872798,
+    "change30": -0.017702248185528617,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
+  },
+  "TGT": {
+    "score": 15,
+    "volume_ratio": 4.484969754539227,
+    "change30": -0.7340025094102985,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
+  },
+  "COST": {
+    "score": 0,
+    "volume_ratio": 0.8011487991799893,
+    "change30": 0.3855667885566828,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T20:57:22.384965+00:00",
+    "last_alert": ""
   }
 }
