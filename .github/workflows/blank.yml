@@ -99,7 +99,7 @@ jobs:
           symbols = groups[group_index]
 
           print("=" * 65)
-          print("🚨 OPPORTUNITY SCANNER V4")
+          print("🚨 OPPORTUNITY SCANNER V5")
           print("=" * 65)
 
           print(
@@ -141,7 +141,7 @@ jobs:
                   return r.read()
 
           # ==================================================
-          # TWELVE DATA
+          # MARKET DATA
           # ==================================================
 
           params = urllib.parse.urlencode({
@@ -160,7 +160,7 @@ jobs:
               url,
               headers={
                   "User-Agent":
-                  "OpportunityScanner/4.0"
+                  "OpportunityScanner/5.0"
               }
           )
 
@@ -184,7 +184,7 @@ jobs:
           errors = 0
 
           # ==================================================
-          # KEYWORDS
+          # CATALIZADORES
           # ==================================================
 
           strong = [
@@ -300,10 +300,27 @@ jobs:
 
                   if len(candles) < 61:
 
+                      print(
+                          f"⚠️ {symbol}: "
+                          "datos insuficientes"
+                      )
+
                       continue
+
+                  # ==================================================
+                  # PRECIOS
+                  # ==================================================
 
                   current = float(
                       candles[0]["close"]
+                  )
+
+                  p5 = float(
+                      candles[5]["close"]
+                  )
+
+                  p15 = float(
+                      candles[15]["close"]
                   )
 
                   p30 = float(
@@ -313,6 +330,16 @@ jobs:
                   p60 = float(
                       candles[60]["close"]
                   )
+
+                  change5 = (
+                      (current - p5)
+                      / p5
+                  ) * 100
+
+                  change15 = (
+                      (current - p15)
+                      / p15
+                  ) * 100
 
                   change30 = (
                       (current - p30)
@@ -324,33 +351,44 @@ jobs:
                       / p60
                   ) * 100
 
-                  first_half = (
+                  # ==================================================
+                  # ACELERACION
+                  # ==================================================
+
+                  move_60_30 = (
                       (p30 - p60)
                       / p60
                   ) * 100
 
-                  second_half = (
-                      (current - p30)
+                  move_30_15 = (
+                      (p15 - p30)
                       / p30
                   ) * 100
 
+                  move_15_0 = (
+                      (current - p15)
+                      / p15
+                  ) * 100
+
                   acceleration = (
-                      second_half
-                      - first_half
+                      move_15_0
+                      - move_30_15
                   )
 
-                  # -------------------------------
-                  # MAXIMO
-                  # -------------------------------
+                  # ==================================================
+                  # MAXIMO 60 MIN
+                  # ==================================================
 
                   highs = []
 
-                  for c in candles:
+                  for candle in candles:
 
                       try:
 
                           highs.append(
-                              float(c["high"])
+                              float(
+                                  candle["high"]
+                              )
                           )
 
                       except:
@@ -364,18 +402,20 @@ jobs:
                       / high
                   ) * 100
 
-                  # -------------------------------
+                  # ==================================================
                   # VOLUMEN
-                  # -------------------------------
+                  # ==================================================
 
                   volumes = []
 
-                  for c in candles:
+                  for candle in candles:
 
                       try:
 
                           volumes.append(
-                              float(c["volume"])
+                              float(
+                                  candle["volume"]
+                              )
                           )
 
                       except:
@@ -392,7 +432,7 @@ jobs:
                           len(volumes[1:])
                       )
 
-                      if average_volume:
+                      if average_volume > 0:
 
                           volume_ratio = (
                               current_volume
@@ -414,15 +454,14 @@ jobs:
 
                   score = 0
 
+                  # Movimiento
                   if change30 >= 3:
                       score += 20
 
                   if change30 >= 5:
                       score += 10
 
-                  if change30 >= 8:
-                      score += 10
-
+                  # Volumen
                   if volume_ratio >= 3:
                       score += 15
 
@@ -432,21 +471,74 @@ jobs:
                   if volume_ratio >= 8:
                       score += 5
 
+                  # Aceleración
                   if acceleration > 0:
                       score += 10
 
                   if acceleration >= 2:
                       score += 5
 
+                  # Cerca del máximo
                   if distance_high <= 1:
                       score += 5
 
+                  # ==================================================
+                  # CLASIFICACION DEL MOMENTO
+                  # ==================================================
+
+                  if change30 >= 10:
+
+                      timing = "🔴 EXTENDED"
+
+                  elif change30 >= 7:
+
+                      timing = "🟠 LATE"
+
+                  elif (
+                      change30 >= 3
+                      and
+                      acceleration > 1
+                      and
+                      volume_ratio >= 3
+                  ):
+
+                      timing = "🟢 EARLY"
+
+                  elif change30 >= 3:
+
+                      timing = "🟡 MOMENTUM"
+
+                  else:
+
+                      timing = "⚪ NORMAL"
+
+                  # ==================================================
+                  # PENALIZACION POR EXTENSION
+                  # ==================================================
+
+                  adjusted_score = score
+
+                  if timing == "🟠 LATE":
+
+                      adjusted_score -= 10
+
+                  elif timing == "🔴 EXTENDED":
+
+                      adjusted_score -= 20
+
+                  if adjusted_score < 0:
+
+                      adjusted_score = 0
+
                   print(
                       f"{symbol} | "
+                      f"5m {change5:+.2f}% | "
+                      f"15m {change15:+.2f}% | "
                       f"30m {change30:+.2f}% | "
                       f"60m {change60:+.2f}% | "
                       f"Vol {volume_ratio:.1f}x | "
-                      f"Score {score}"
+                      f"{timing} | "
+                      f"Score {adjusted_score}"
                   )
 
                   # ==================================================
@@ -458,7 +550,7 @@ jobs:
                       and
                       volume_ratio >= 3
                       and
-                      score >= 45
+                      adjusted_score >= 45
                   ):
 
                       continue
@@ -466,7 +558,8 @@ jobs:
                   candidates += 1
 
                   print(
-                      f"🔎 CANDIDATA {symbol}"
+                      f"🔎 CANDIDATA: "
+                      f"{symbol}"
                   )
 
                   # ==================================================
@@ -474,7 +567,9 @@ jobs:
                   # ==================================================
 
                   after = (
-                      datetime.now(timezone.utc)
+                      datetime.now(
+                          timezone.utc
+                      )
                       -
                       timedelta(hours=3)
                   ).strftime(
@@ -487,23 +582,17 @@ jobs:
 
                       "symbols": symbol,
 
-                      "filter_entities":
-                      "true",
+                      "filter_entities": "true",
 
-                      "must_have_entities":
-                      "true",
+                      "must_have_entities": "true",
 
-                      "language":
-                      "en",
+                      "language": "en",
 
-                      "limit":
-                      "5",
+                      "limit": "5",
 
-                      "published_after":
-                      after,
+                      "published_after": after,
 
-                      "sort":
-                      "published_at"
+                      "sort": "published_at"
 
                   })
 
@@ -517,7 +606,7 @@ jobs:
                       news_url,
                       headers={
                           "User-Agent":
-                          "OpportunityScanner/4.0"
+                          "OpportunityScanner/5.0"
                       }
                   )
 
@@ -545,7 +634,7 @@ jobs:
                       )
 
                   # ==================================================
-                  # MEJOR NOTICIA
+                  # MEJOR CATALIZADOR
                   # ==================================================
 
                   best = None
@@ -566,8 +655,13 @@ jobs:
                           category = cat
                           hits = found
 
+                  # ==================================================
+                  # SCORE FINAL
+                  # ==================================================
+
                   final_score = (
-                      score + news_bonus
+                      adjusted_score
+                      + news_bonus
                   )
 
                   if final_score > 100:
@@ -626,7 +720,6 @@ jobs:
                       )
 
                       source = ""
-
                       article_url = ""
 
                   # ==================================================
@@ -643,8 +736,17 @@ jobs:
 
                       f"{level}\n\n"
 
+                      f"⏱ MOMENTO: "
+                      f"{timing}\n\n"
+
                       f"💰 Precio: "
                       f"${current:.2f}\n"
+
+                      f"📊 5 min: "
+                      f"{change5:+.2f}%\n"
+
+                      f"📊 15 min: "
+                      f"{change15:+.2f}%\n"
 
                       f"📊 30 min: "
                       f"{change30:+.2f}%\n"
@@ -700,8 +802,7 @@ jobs:
                   else:
 
                       message += (
-                          "\nNo se encontró "
-                          "noticia relevante "
+                          "\nSin noticia relevante "
                           "en las últimas 3h.\n"
                       )
 
