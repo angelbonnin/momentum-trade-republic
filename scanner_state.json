@@ -126,5 +126,69 @@
     "timing": "⚪ NORMAL",
     "updated": "2026-08-20T08:59:29.375580+00:00",
     "last_alert": ""
+  },
+  "JPM": {
+    "score": 35,
+    "volume_ratio": 7.7585174980360225,
+    "change30": 0.1162802426416139,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
+  },
+  "BAC": {
+    "score": 40,
+    "volume_ratio": 18.11266779430901,
+    "change30": 0.15851787522418584,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
+  },
+  "GS": {
+    "score": 35,
+    "volume_ratio": 7.399446239800095,
+    "change30": 0.3219918456389894,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
+  },
+  "MS": {
+    "score": 30,
+    "volume_ratio": 14.245165177035096,
+    "change30": 0.15774061999743053,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
+  },
+  "C": {
+    "score": 40,
+    "volume_ratio": 10.967430190238261,
+    "change30": -0.11649544034773168,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
+  },
+  "WFC": {
+    "score": 40,
+    "volume_ratio": 29.31566593056511,
+    "change30": 0.19234131841231714,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
+  },
+  "V": {
+    "score": 30,
+    "volume_ratio": 18.65634612764676,
+    "change30": -0.35283609580185893,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
+  },
+  "MA": {
+    "score": 30,
+    "volume_ratio": 15.732347143443747,
+    "change30": -0.22992302576963206,
+    "timing": "NORMAL",
+    "updated": "2026-08-20T09:06:38.130287+00:00",
+    "last_alert": ""
   }
 }
