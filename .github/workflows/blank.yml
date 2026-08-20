@@ -1,16 +1,23 @@
-name: Marketaux Test
+name: Opportunity Scanner
 
 on:
   workflow_dispatch:
 
+  schedule:
+    - cron: "*/15 13-19 * * 1-5"
+
 jobs:
-  test:
+  scanner:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Probar Marketaux
+      - name: Escanear oportunidades
         env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_NUMBER: ${{ github.run_number }}
 
         run: |
           python - <<'PY'
@@ -18,19 +25,135 @@ jobs:
           import urllib.parse
           import urllib.request
           import json
+          from datetime import datetime, timezone, timedelta
 
-          API_KEY = os.environ["MARKETAUX_API_KEY"]
+          TWELVE_KEY = os.environ["TWELVE_DATA_API_KEY"]
+          MARKETAUX_KEY = os.environ["MARKETAUX_API_KEY"]
+          BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+          CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+
+          run_number = int(
+              os.environ.get("RUN_NUMBER", "1")
+          )
+
+          # ==========================================
+          # GRUPOS
+          # ==========================================
+
+          GROUPS = [
+              [
+                  "NVDA",
+                  "AMD",
+                  "TSLA",
+                  "PLTR",
+                  "COIN",
+                  "HOOD",
+                  "MSTR",
+                  "SMCI"
+              ],
+              [
+                  "APP",
+                  "ARM",
+                  "AVGO",
+                  "MU",
+                  "MRVL",
+                  "TSM",
+                  "QCOM",
+                  "INTC"
+              ],
+              [
+                  "AMZN",
+                  "META",
+                  "NFLX",
+                  "GOOG",
+                  "GOOGL",
+                  "AAPL",
+                  "MSFT",
+                  "AMAT"
+              ],
+              [
+                  "LRCX",
+                  "CRWD",
+                  "PANW",
+                  "SNOW",
+                  "DDOG",
+                  "NET",
+                  "RBLX",
+                  "SHOP"
+              ],
+              [
+                  "UBER",
+                  "ABNB",
+                  "MELI",
+                  "CVNA",
+                  "RIVN",
+                  "NIO",
+                  "SOFI",
+                  "MARA"
+              ]
+          ]
+
+          group_index = (
+              (run_number - 1)
+              % len(GROUPS)
+          )
+
+          symbols = GROUPS[group_index]
+
+          print("=" * 60)
+          print("🚨 OPPORTUNITY SCANNER")
+          print("=" * 60)
+          print(
+              f"Grupo: "
+              f"{group_index + 1}/5"
+          )
+          print(
+              "Acciones: "
+              + ", ".join(symbols)
+          )
+          print("=" * 60)
+
+          # ==========================================
+          # TELEGRAM
+          # ==========================================
+
+          def send_telegram(message):
+
+              url = (
+                  "https://api.telegram.org/"
+                  f"bot{BOT_TOKEN}/sendMessage"
+              )
+
+              data = urllib.parse.urlencode({
+                  "chat_id": CHAT_ID,
+                  "text": message
+              }).encode()
+
+              request = urllib.request.Request(
+                  url,
+                  data=data
+              )
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=20
+              ) as response:
+
+                  return response.read().decode()
+
+          # ==========================================
+          # TWELVE DATA
+          # ==========================================
 
           params = urllib.parse.urlencode({
-              "api_token": API_KEY,
-              "symbols": "MRNA",
-              "filter_entities": "true",
-              "language": "en",
-              "limit": "5"
+              "symbol": ",".join(symbols),
+              "interval": "1min",
+              "outputsize": "61",
+              "apikey": TWELVE_KEY
           })
 
           url = (
-              "https://api.marketaux.com/v1/news/all?"
+              "https://api.twelvedata.com/time_series?"
               + params
           )
 
@@ -51,58 +174,451 @@ jobs:
 
                   data = json.load(response)
 
-              print("=" * 60)
-              print("MARKETAUX")
-              print("=" * 60)
-
-              if "data" not in data:
-
-                  print("❌ No se recibió el campo data")
-                  print(data)
-                  raise SystemExit(1)
-
-              articles = data["data"]
-
-              print(
-                  f"Noticias recibidas: "
-                  f"{len(articles)}"
-              )
-
-              print()
-
-              for article in articles:
-
-                  title = article.get(
-                      "title",
-                      "Sin título"
-                  )
-
-                  source = article.get(
-                      "source",
-                      "Desconocida"
-                  )
-
-                  published = article.get(
-                      "published_at",
-                      "Fecha desconocida"
-                  )
-
-                  print("📰", title)
-                  print("Fuente:", source)
-                  print("Fecha:", published)
-                  print("-" * 60)
-
-              print()
-              print("✅ PRUEBA COMPLETADA")
-
           except Exception as error:
 
-              print("❌ ERROR MARKETAUX")
-              print(
-                  type(error).__name__
-              )
+              print("❌ ERROR TWELVE DATA")
+              print(type(error).__name__)
               print(str(error))
-
               raise SystemExit(1)
+
+          candidates = 0
+          errors = 0
+
+          # ==========================================
+          # ANALISIS DE ACCIONES
+          # ==========================================
+
+          for symbol in symbols:
+
+              try:
+
+                  if symbol not in data:
+
+                      print(
+                          f"❌ {symbol}: "
+                          "sin datos"
+                      )
+
+                      errors += 1
+                      continue
+
+                  symbol_data = data[symbol]
+
+                  if "values" not in symbol_data:
+
+                      print(
+                          f"❌ {symbol}: "
+                          "sin velas"
+                      )
+
+                      errors += 1
+                      continue
+
+                  values = symbol_data["values"]
+
+                  if len(values) < 61:
+
+                      print(
+                          f"❌ {symbol}: "
+                          "datos insuficientes"
+                      )
+
+                      errors += 1
+                      continue
+
+                  # ----------------------------------
+                  # PRECIOS
+                  # ----------------------------------
+
+                  current_price = float(
+                      values[0]["close"]
+                  )
+
+                  price_30m = float(
+                      values[30]["close"]
+                  )
+
+                  price_60m = float(
+                      values[60]["close"]
+                  )
+
+                  change_30m = (
+                      (
+                          current_price
+                          - price_30m
+                      )
+                      / price_30m
+                  ) * 100
+
+                  change_60m = (
+                      (
+                          current_price
+                          - price_60m
+                      )
+                      / price_60m
+                  ) * 100
+
+                  # ----------------------------------
+                  # ACELERACION
+                  # ----------------------------------
+
+                  first_half = (
+                      (
+                          price_30m
+                          - price_60m
+                      )
+                      / price_60m
+                  ) * 100
+
+                  second_half = (
+                      (
+                          current_price
+                          - price_30m
+                      )
+                      / price_30m
+                  ) * 100
+
+                  acceleration = (
+                      second_half
+                      - first_half
+                  )
+
+                  # ----------------------------------
+                  # MAXIMO
+                  # ----------------------------------
+
+                  highs = []
+
+                  for candle in values:
+
+                      try:
+
+                          highs.append(
+                              float(
+                                  candle["high"]
+                              )
+                          )
+
+                      except:
+
+                          pass
+
+                  max_price = (
+                      max(highs)
+                      if highs
+                      else current_price
+                  )
+
+                  distance_from_high = (
+                      (
+                          max_price
+                          - current_price
+                      )
+                      / max_price
+                  ) * 100
+
+                  # ----------------------------------
+                  # VOLUMEN
+                  # ----------------------------------
+
+                  volumes = []
+
+                  for candle in values:
+
+                      if "volume" in candle:
+
+                          try:
+
+                              volumes.append(
+                                  float(
+                                      candle["volume"]
+                                  )
+                              )
+
+                          except:
+
+                              pass
+
+                  if len(volumes) >= 2:
+
+                      current_volume = volumes[0]
+
+                      historical = volumes[1:]
+
+                      average_volume = (
+                          sum(historical)
+                          / len(historical)
+                      )
+
+                      if average_volume > 0:
+
+                          volume_ratio = (
+                              current_volume
+                              / average_volume
+                          )
+
+                      else:
+
+                          volume_ratio = 0
+
+                  else:
+
+                      volume_ratio = 0
+
+                  # ----------------------------------
+                  # SCORE TECNICO
+                  # ----------------------------------
+
+                  technical_score = 0
+
+                  if change_30m >= 3:
+                      technical_score += 20
+
+                  if change_30m >= 5:
+                      technical_score += 10
+
+                  if volume_ratio >= 4:
+                      technical_score += 20
+
+                  if volume_ratio >= 8:
+                      technical_score += 10
+
+                  if acceleration > 0:
+                      technical_score += 10
+
+                  if acceleration >= 2:
+                      technical_score += 10
+
+                  if distance_from_high <= 1:
+                      technical_score += 10
+
+                  print(
+                      f"{symbol} | "
+                      f"30m "
+                      f"{change_30m:+.2f}% | "
+                      f"60m "
+                      f"{change_60m:+.2f}% | "
+                      f"Vol "
+                      f"{volume_ratio:.1f}x | "
+                      f"Score "
+                      f"{technical_score}/90"
+                  )
+
+                  # ==================================
+                  # FILTRO DE CANDIDATA
+                  # ==================================
+
+                  if not (
+                      change_30m >= 3
+                      and
+                      volume_ratio >= 4
+                      and
+                      technical_score >= 50
+                  ):
+
+                      continue
+
+                  candidates += 1
+
+                  print(
+                      f"🔎 CANDIDATA: "
+                      f"{symbol}"
+                  )
+
+                  # ==================================
+                  # MARKETAUX
+                  # ==================================
+
+                  news_params = urllib.parse.urlencode({
+                      "api_token": MARKETAUX_KEY,
+                      "symbols": symbol,
+                      "filter_entities": "true",
+                      "language": "en",
+                      "limit": "5"
+                  })
+
+                  news_url = (
+                      "https://api.marketaux.com/"
+                      "v1/news/all?"
+                      + news_params
+                  )
+
+                  news_request = (
+                      urllib.request.Request(
+                          news_url,
+                          headers={
+                              "User-Agent":
+                                  "OpportunityScanner/1.0"
+                          }
+                      )
+                  )
+
+                  news = []
+
+                  try:
+
+                      with urllib.request.urlopen(
+                          news_request,
+                          timeout=30
+                      ) as response:
+
+                          news_data = json.load(
+                              response
+                          )
+
+                      news = news_data.get(
+                          "data",
+                          []
+                      )
+
+                  except Exception as error:
+
+                      print(
+                          f"⚠️ Noticias {symbol}: "
+                          f"{error}"
+                      )
+
+                  # ==================================
+                  # CATALIZADOR
+                  # ==================================
+
+                  catalyst = None
+
+                  if news:
+
+                      # La primera noticia disponible
+                      # se utiliza como posible catalizador.
+
+                      latest = news[0]
+
+                      catalyst = latest.get(
+                          "title",
+                          "Noticia reciente"
+                      )
+
+                  # ==================================
+                  # SCORE FINAL
+                  # ==================================
+
+                  final_score = technical_score
+
+                  if catalyst:
+
+                      final_score += 10
+
+                  if final_score > 100:
+
+                      final_score = 100
+
+                  # ==================================
+                  # NIVEL
+                  # ==================================
+
+                  if final_score >= 85:
+
+                      level = "🔴 EXTREMO"
+
+                  elif final_score >= 70:
+
+                      level = "🟠 FUERTE"
+
+                  elif final_score >= 50:
+
+                      level = "🟡 INTERESANTE"
+
+                  else:
+
+                      level = "⚪ VIGILAR"
+
+                  # ==================================
+                  # TELEGRAM
+                  # ==================================
+
+                  message = (
+                      "🚨 OPORTUNIDAD MOMENTUM\n\n"
+                      f"📈 {symbol}\n\n"
+                      f"🎯 SCORE: "
+                      f"{final_score}/100\n"
+                      f"{level}\n\n"
+                      f"💰 Precio: "
+                      f"${current_price:.2f}\n"
+                      f"📊 30 min: "
+                      f"{change_30m:+.2f}%\n"
+                      f"📊 60 min: "
+                      f"{change_60m:+.2f}%\n"
+                      f"🔥 Volumen: "
+                      f"{volume_ratio:.1f}x\n"
+                      f"⚡ Aceleración: "
+                      f"{acceleration:+.2f}\n"
+                      f"📈 Distancia máximo: "
+                      f"{distance_from_high:.2f}%\n\n"
+                  )
+
+                  if catalyst:
+
+                      message += (
+                          "📰 CATALIZADOR:\n"
+                          f"{catalyst}\n\n"
+                      )
+
+                  else:
+
+                      message += (
+                          "📰 Catalizador: "
+                          "no encontrado\n\n"
+                      )
+
+                  message += (
+                      "⚠️ Revisar gráfico, "
+                      "noticia y liquidez "
+                      "antes de operar."
+                  )
+
+                  try:
+
+                      send_telegram(
+                          message
+                      )
+
+                      print(
+                          f"📱 ALERTA: "
+                          f"{symbol}"
+                      )
+
+                  except Exception as error:
+
+                      print(
+                          f"❌ Telegram "
+                          f"{symbol}: "
+                          f"{error}"
+                      )
+
+              except Exception as error:
+
+                  print(
+                      f"⚠️ {symbol}: "
+                      f"{type(error).__name__}: "
+                      f"{error}"
+                  )
+
+                  errors += 1
+
+          # ==========================================
+          # RESUMEN
+          # ==========================================
+
+          print("=" * 60)
+          print(
+              f"🎯 Candidatas: "
+              f"{candidates}"
+          )
+          print(
+              f"⚠️ Errores: "
+              f"{errors}"
+          )
+          print(
+              "✅ ESCANEO TERMINADO"
+          )
+          print("=" * 60)
 
           PY
