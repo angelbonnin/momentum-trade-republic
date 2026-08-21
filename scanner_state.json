@@ -510,5 +510,69 @@
     "timing": "NORMAL",
     "updated": "2026-08-20T21:58:53.040664+00:00",
     "last_alert": ""
+  },
+  "TSLA": {
+    "score": 10,
+    "volume_ratio": 1.9074349026195918,
+    "change30": 0.5694283675983735,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
+  },
+  "PLTR": {
+    "score": 0,
+    "volume_ratio": 1.789245547337856,
+    "change30": -0.5887173874761481,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
+  },
+  "APP": {
+    "score": 25,
+    "volume_ratio": 5.021521377887122,
+    "change30": -0.1099896480331366,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
+  },
+  "HOOD": {
+    "score": 25,
+    "volume_ratio": 4.538341718585746,
+    "change30": 0.4753855905345477,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
+  },
+  "COIN": {
+    "score": 40,
+    "volume_ratio": 10.17443568385125,
+    "change30": 0.7359871495327235,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
+  },
+  "MSTR": {
+    "score": 25,
+    "volume_ratio": 5.597942780204064,
+    "change30": 0.7625370054723193,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
+  },
+  "MARA": {
+    "score": 30,
+    "volume_ratio": 4.536634013456377,
+    "change30": 1.9186296286140083,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
+  },
+  "RIVN": {
+    "score": 40,
+    "volume_ratio": 12.469034714339402,
+    "change30": 0.553852433280992,
+    "timing": "NORMAL",
+    "updated": "2026-08-21T10:10:11.683581+00:00",
+    "last_alert": ""
   }
 }
